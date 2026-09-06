@@ -1,0 +1,10 @@
+# Backups y logs locales
+backups/*.sql
+backups/*.log
+*.log
+
+# Archivos de sistema y editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

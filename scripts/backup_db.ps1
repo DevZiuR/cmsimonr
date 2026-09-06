@@ -44,4 +44,15 @@ Get-ChildItem -Path $backupDir -Filter 'contraloria_db_*.sql' | Sort-Object Last
 
 $size = [math]::Round((Get-Item -LiteralPath $file).Length / 1KB, 1)
 "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] OK $file ($size KB)" | Add-Content -Path $log
-Write-Output "Backup creado: $file ($size KB)"
+Write-Output "✅ Backup local creado: $file ($size KB)"
+
+# Sincronización automática a la nube si OneDrive está disponible
+$oneDrivePath = Join-Path $env:UserProfile 'OneDrive'
+if (Test-Path -LiteralPath $oneDrivePath) {
+    $cloudDir = Join-Path $oneDrivePath 'Backups_Sistema'
+    New-Item -ItemType Directory -Force -Path $cloudDir | Out-Null
+    $cloudFile = Join-Path $cloudDir "contraloria_db_$stamp.sql"
+    Copy-Item -LiteralPath $file -Destination $cloudFile -Force
+    Get-ChildItem -Path $cloudDir -Filter 'contraloria_db_*.sql' | Sort-Object LastWriteTime -Descending | Select-Object -Skip $keepLast | Remove-Item -Force -ErrorAction SilentlyContinue
+    Write-Output "☁️ Copia en la nube guardada: $cloudFile"
+}
