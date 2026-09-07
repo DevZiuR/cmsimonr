@@ -620,21 +620,22 @@ if (isset($_GET['ajax'])) {
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
+            background: #f4f4f5;
+            color: #000000;
+            border: 1px solid #e4e4e7;
+            transition: all 0.15s ease;
         }
 
-        .qdi-icon-op {
-            background: #eff6ff;
-            color: #2563eb;
-        }
-
-        .qdi-icon-banavih {
-            background: #f0fdf4;
-            color: #16a34a;
-        }
-
+        .qdi-icon-op,
+        .qdi-icon-banavih,
         .qdi-icon-ivss {
-            background: #faf5ff;
-            color: #9333ea;
+            background: #f4f4f5;
+            color: #000000;
+        }
+
+        .quick-dropdown-item:hover .qdi-icon {
+            background: #e4e4e7;
+            color: #000000;
         }
 
         .qdi-text {
@@ -647,10 +648,11 @@ if (isset($_GET['ajax'])) {
             font-size: 12px;
             font-weight: 700;
             color: #1e293b;
+            transition: color 0.15s ease;
         }
 
         .quick-dropdown-item:hover .qdi-title {
-            color: #2563eb;
+            color: #000000;
         }
 
         .qdi-desc {
