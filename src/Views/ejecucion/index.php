@@ -430,7 +430,11 @@ foreach ($partidas as $p) {
        Cualquier otra partida es 0.00 */
     $es_partida_con_comp_pagar = (strpos($p['codificacion'], '403-18-01') !== false || strpos($p['codificacion'], '403-18-99') !== false);
     if ($es_partida_con_comp_pagar) {
-        $comp_pagar = max(0.0, $comp_acumulado - $gastos_causados);
+        if (isset($ret_ovr_map[$p['codificacion']])) {
+            $comp_pagar = $ret_ovr_map[$p['codificacion']];
+        } else {
+            $comp_pagar = max(0.0, $comp_acumulado - $gastos_causados);
+        }
     } else {
         $comp_pagar = 0.0;
     }
@@ -725,6 +729,7 @@ $active = 'ejecucion';
             margin-top: 3px;
             font-weight: 500;
             color: rgba(255, 255, 255, 0.85);
+            margin-bottom: 0;
         }
 
         .btn-nueva {
@@ -740,17 +745,17 @@ $active = 'ejecucion';
             display: inline-flex;
             align-items: center;
             gap: 6px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
             transition: all 0.15s ease;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
             white-space: nowrap;
             font-family: inherit;
         }
 
         .btn-nueva:hover {
             background: #ffffff;
-            color: #1d4ed8;
-            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+            color: #2563eb;
             transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
         }
 
         .btn-nueva-secondary {
@@ -765,184 +770,216 @@ $active = 'ejecucion';
             border-color: #38bdf8;
         }
 
-        /* ── Filter card ─────────────────────────────────────────────── */
-        .filter-card {
-            background: #0f172a;
-            border: 1px solid #1e293b;
-            border-radius: 14px;
-            padding: 16px 22px;
-            margin-bottom: 24px;
+        /* ── Barra de Herramientas y Filtros Unificada ────────────────────── */
+        .ejec-toolbar {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 10px 16px;
+            margin-bottom: 20px;
             display: flex;
             align-items: center;
-            gap: 16px;
-            flex-wrap: wrap;
-            box-shadow: 0 4px 14px rgba(15, 23, 42, 0.15);
-        }
-
-        .filter-title {
-            display: flex;
-            align-items: center;
-            gap: 7px;
-            font-size: 11px;
-            font-weight: 700;
-            color: #38bdf8;
-            text-transform: uppercase;
-            letter-spacing: .5px;
-            white-space: nowrap;
-        }
-
-        .filter-controls {
-            display: flex;
-            align-items: center;
+            justify-content: space-between;
             gap: 14px;
             flex-wrap: wrap;
-            flex: 1;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
         }
 
-        .filter-group {
+        .ejec-filter-form {
             display: flex;
             align-items: center;
             gap: 8px;
+            flex-wrap: wrap;
+            margin: 0;
         }
 
-        .filter-group label {
-            font-size: 11px;
-            font-weight: 600;
-            color: #94a3b8;
-            white-space: nowrap;
-        }
-
-        .filter-select {
-            padding: 7px 14px;
-            font-family: inherit;
-            font-size: 12px;
-            font-weight: 600;
-            border: 1px solid #334155;
-            border-radius: 8px;
-            background: #1e293b;
-            color: #f8fafc;
-            outline: none;
-            transition: all .15s ease;
-        }
-
-        .filter-select:focus {
-            border-color: #38bdf8;
-            box-shadow: 0 0 0 3px rgba(56, 189, 248, .2);
-        }
-
-        .btn-apply-filter {
-            background: #2563eb;
-            color: #ffffff;
-            border: 1px solid #2563eb;
-            padding: 7px 18px;
-            font-size: 12px;
-            font-weight: 600;
-            border-radius: 8px;
-            cursor: pointer;
+        .ejec-filter-label {
             display: inline-flex;
             align-items: center;
             gap: 6px;
+            font-size: 11.5px;
+            font-weight: 700;
+            color: #475569;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .ejec-select-wrap {
+            position: relative;
+        }
+
+        .ejec-select {
+            padding: 6px 12px;
             font-family: inherit;
-            transition: all .15s ease;
-            box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
-        }
-
-        .btn-apply-filter:hover {
-            background: #1d4ed8;
-            border-color: #1d4ed8;
-            transform: translateY(-1px);
-        }
-
-        /* ── Action buttons row & CTA styling ────────────────────────── */
-        .action-row {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 24px;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-
-        .btn-primary {
-            background: #2563eb;
-            color: #fff;
-            border: 1px solid #2563eb;
-            padding: 9px 18px;
             font-size: 12px;
             font-weight: 600;
-            border-radius: 10px;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 7px;
+            background: #f8fafc;
+            color: #0f172a;
+            outline: none;
+            transition: all 0.15s ease;
             cursor: pointer;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 7px;
-            font-family: inherit;
-            transition: all .15s ease;
-            box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
         }
 
-        .btn-primary:hover {
-            background: #1d4ed8;
-            border-color: #1d4ed8;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(37, 99, 235, .35);
+        .ejec-select:focus {
+            border-color: #2563eb;
+            background: #ffffff;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
         }
 
-        /* Darker, sleek controls for secondary buttons */
-        .btn-secondary,
-        .btn-seed,
-        .btn-print {
+        .ejec-btn-apply {
             background: #0f172a;
-            color: #e2e8f0;
-            border: 1px solid #334155;
-            padding: 9px 16px;
-            font-size: 12px;
+            color: #ffffff;
+            border: 1px solid #1e293b;
+            padding: 6px 12px;
+            font-size: 11.5px;
             font-weight: 600;
-            border-radius: 10px;
+            border-radius: 7px;
             cursor: pointer;
-            text-decoration: none;
             display: inline-flex;
             align-items: center;
-            gap: 7px;
+            gap: 5px;
             font-family: inherit;
-            transition: all .15s ease;
-            box-shadow: 0 2px 5px rgba(15, 23, 42, 0.15);
+            transition: all 0.15s ease;
         }
 
-        .btn-secondary:hover,
-        .btn-seed:hover,
-        .btn-print:hover {
+        .ejec-btn-apply:hover {
             background: #1e293b;
             color: #38bdf8;
-            border-color: #475569;
             transform: translateY(-1px);
-            box-shadow: 0 4px 10px rgba(15, 23, 42, 0.25);
+        }
+
+        .ejec-tools-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .ejec-tool-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            font-size: 11.5px;
+            font-weight: 600;
+            border-radius: 7px;
+            cursor: pointer;
+            text-decoration: none;
+            color: #334155;
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            transition: all 0.15s ease;
+            font-family: inherit;
+            white-space: nowrap;
+        }
+
+        .ejec-tool-btn:hover {
+            background: #e2e8f0;
+            color: #0f172a;
+            border-color: #94a3b8;
+            transform: translateY(-1px);
+        }
+
+        .ejec-tool-btn-print {
+            background: #fef2f2;
+            color: #b91c1c;
+            border-color: #fecaca;
+        }
+
+        .ejec-tool-btn-print:hover {
+            background: #dc2626;
+            color: #ffffff;
+            border-color: #b91c1c;
+            box-shadow: 0 2px 8px rgba(220, 38, 38, 0.25);
+        }
+
+        .ejec-tool-btn-seed {
+            background: #eff6ff;
+            color: #1d4ed8;
+            border-color: #bfdbfe;
+        }
+
+        .ejec-tool-btn-seed:hover {
+            background: #2563eb;
+            color: #ffffff;
+            border-color: #1d4ed8;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
         }
 
         /* ── Table wrapper ───────────────────────────────────────────── */
         .table-wrapper {
-            background: #fff;
+            background: #ffffff;
+            border: 1px solid #334155;
             border-radius: 16px;
-            box-shadow: 0 1px 4px rgba(15, 23, 42, .06), 0 1px 2px rgba(15, 23, 42, .04);
-            overflow-x: auto;
+            box-shadow: 0 4px 16px rgba(15, 23, 42, .08);
+            overflow: hidden;
             margin-bottom: 32px;
         }
 
         .table-panel-head {
-            padding: 16px 24px;
+            padding: 14px 22px;
             border-bottom: 1px solid #334155;
             display: flex;
             align-items: center;
             justify-content: space-between;
             background: #0f172a;
             color: #f8fafc;
+            gap: 16px;
+            flex-wrap: wrap;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .table-panel-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .table-panel-head h2 {
-            font-size: 13px;
+            font-size: 13.5px;
             font-weight: 700;
             color: #f8fafc;
             text-transform: uppercase;
             letter-spacing: .4px;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .table-panel-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .table-meta-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 500;
+            color: #94a3b8;
+            background: #1e293b;
+            border: 1px solid #334155;
+        }
+
+        .table-meta-pill strong {
+            color: #f8fafc;
+            font-weight: 700;
+        }
+
+        .table-scroll-wrap {
+            overflow-x: auto;
+            width: 100%;
+            background: #ffffff;
+            -webkit-overflow-scrolling: touch;
         }
 
         /* ── Report table ────────────────────────────────────────────── */
@@ -1425,6 +1462,9 @@ $active = 'ejecucion';
         body.fullscreen-mode .page-subtitle,
         body.fullscreen-mode .filter-card,
         body.fullscreen-mode .action-row,
+        body.fullscreen-mode .top-bar,
+        body.fullscreen-mode .ejec-header,
+        body.fullscreen-mode .ejec-toolbar,
         body.fullscreen-mode .site-footer {
             display: none !important;
         }
@@ -1491,6 +1531,52 @@ $active = 'ejecucion';
         .fs-btn:hover {
             background: #1e293b;
         }
+
+        /* ── Flechas flotantes de navegación horizontal (Solo 2 flechas) ── */
+        .table-sticky-nav {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(15, 23, 42, 0.88);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 5px 8px;
+            border-radius: 40px;
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+        }
+
+        .nav-btn-arrow {
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            color: #ffffff;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            outline: none;
+        }
+
+        .nav-btn-arrow:hover {
+            background: #2563eb;
+            border-color: #3b82f6;
+            color: #ffffff;
+            transform: scale(1.08);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+        }
+
+        .nav-btn-arrow:active {
+            transform: scale(0.94);
+        }
     </style>
 </head>
 
@@ -1505,51 +1591,49 @@ $active = 'ejecucion';
         <!-- MAIN -->
         <main class="main-content">
 
+            <!-- ══ FLOATING EXIT BUTTON FOR FULLSCREEN MODE ═══════════════════════ -->
+            <div id="fullscreen-actions">
+                <button type="button" id="btn-salir-fullscreen" onclick="toggleFullscreenMode()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    Salir de Pantalla Completa (Esc)
+                </button>
+            </div>
+
             <!-- ══ BARRA DE TÍTULO Y BOTÓN DE ACCIÓN ═════════════════════════════ -->
             <div class="top-bar no-print">
                 <div>
                     <h1>EJECUCIÓN DEL PRESUPUESTO DE GASTOS</h1>
-                    <p>Reporte Mensual &mdash; Mes de <?php echo htmlspecialchars($nombre_mes . ' de ' . $anio_sel); ?>
-                    </p>
+                    <p>Reporte Mensual &mdash; Mes de <?php echo htmlspecialchars($nombre_mes . ' de ' . $anio_sel); ?></p>
                 </div>
                 <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
                     <a href="listado.php" class="btn-nueva btn-nueva-secondary" title="Volver al Listado General">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="19" y1="12" x2="5" y2="12" />
-                            <polyline points="12 19 5 12 12 5" />
-                        </svg>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
                         LISTADO DE EJECUCIONES
                     </a>
                     <?php if ($es_admin): ?>
-                        <button type="button" class="btn-nueva" onclick="addNewTableRow()">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                                <line x1="12" y1="5" x2="12" y2="19" />
-                                <line x1="5" y1="12" x2="19" y2="12" />
-                            </svg>
-                            AGREGAR PARTIDA
+                        <button type="button" class="btn-nueva" onclick="addNewTableRow()" title="Agregar nueva partida">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            + AGREGAR PARTIDA
                         </button>
                     <?php endif; ?>
                 </div>
             </div>
 
-            <!-- ── Filtro mes/año ── -->
-            <div class="filter-card no-print">
-                <span class="filter-title">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="4" width="18" height="18" rx="2" />
-                        <line x1="16" y1="2" x2="16" y2="6" />
-                        <line x1="8" y1="2" x2="8" y2="6" />
-                        <line x1="3" y1="10" x2="21" y2="10" />
-                    </svg>
-                    Período
-                </span>
-                <form class="filter-controls" method="GET" action="index.php">
-                    <div class="filter-group">
-                        <label for="sel-mes">Mes:</label>
-                        <select name="mes" id="sel-mes" class="filter-select">
+            <!-- ── BARRA DE HERRAMIENTAS Y ACCIONES UNIFICADA ── -->
+            <div class="ejec-toolbar no-print">
+                <!-- Lado Izquierdo: Filtro Mes / Año -->
+                <form class="ejec-filter-form" method="GET" action="index.php">
+                    <div class="ejec-filter-label">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="4" width="18" height="18" rx="2" />
+                            <line x1="16" y1="2" x2="16" y2="6" />
+                            <line x1="8" y1="2" x2="8" y2="6" />
+                            <line x1="3" y1="10" x2="21" y2="10" />
+                        </svg>
+                        <span>Período:</span>
+                    </div>
+                    <div class="ejec-select-wrap">
+                        <select name="mes" id="sel-mes" class="ejec-select" onchange="this.form.submit()">
                             <?php foreach ($meses_es as $n => $nm): ?>
                                 <option value="<?php echo $n; ?>" <?php echo ($n == $mes_sel ? ' selected' : ''); ?>>
                                     <?php echo htmlspecialchars($nm); ?>
@@ -1557,9 +1641,8 @@ $active = 'ejecucion';
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="filter-group">
-                        <label for="sel-anio">Año:</label>
-                        <select name="anio" id="sel-anio" class="filter-select">
+                    <div class="ejec-select-wrap">
+                        <select name="anio" id="sel-anio" class="ejec-select" onchange="this.form.submit()">
                             <?php for ($y = 2024; $y <= 2030; $y++): ?>
                                 <option value="<?php echo $y; ?>" <?php echo ($y == $anio_sel ? ' selected' : ''); ?>>
                                     <?php echo $y; ?>
@@ -1567,108 +1650,92 @@ $active = 'ejecucion';
                             <?php endfor; ?>
                         </select>
                     </div>
-                    <button type="submit" class="btn-apply-filter" id="btn-aplicar-filtro">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <button type="submit" class="ejec-btn-apply" id="btn-aplicar-filtro" title="Actualizar vista con el período seleccionado">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="20 6 9 17 4 12" />
                         </svg>
-                        Aplicar
+                        Filtrar
                     </button>
                 </form>
-            </div>
 
-            <!-- ── Botones de acción ── -->
-            <div class="action-row no-print">
-                <a href="listado.php" class="btn-secondary" id="btn-volver-listado" title="Volver al Listado General">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="19" y1="12" x2="5" y2="12" />
-                        <polyline points="12 19 5 12 12 5" />
-                    </svg>
-                    Listado de Ejecuciones
-                </a>
-                <?php if ($es_admin): ?>
-                    <button type="button" class="btn-primary" onclick="addNewTableRow()">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                            stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="12" y1="5" x2="12" y2="19" />
-                            <line x1="5" y1="12" x2="19" y2="12" />
+                <!-- Lado Derecho: Acciones y Herramientas del Reporte -->
+                <div class="ejec-tools-group">
+                    <a href="matriz.php?mes=<?php echo $mes_sel; ?>&anio=<?php echo $anio_sel; ?>" class="ejec-tool-btn" id="btn-vista-individual" title="Ver registro detallado por partida individual">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                            <line x1="16" y1="13" x2="8" y2="13" />
+                            <line x1="16" y1="17" x2="8" y2="17" />
                         </svg>
-                        Agregar Partida
-                    </button>
-                    <a href="index.php?mes=<?php echo $mes_sel; ?>&anio=<?php echo $anio_sel; ?>&precargar=1"
-                        class="btn-seed" id="btn-precargar-catalogo"
-                        onclick="return confirm('¿Desea precargar las 165 partidas del catálogo presupuestario para <?php echo htmlspecialchars($nombre_mes . ' ' . $anio_sel); ?>?');">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                            stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                            <polyline points="7 10 12 15 17 10" />
-                            <line x1="12" y1="15" x2="12" y2="3" />
-                        </svg>
-                        Precargar Catálogo Completo (165)
+                        <span>Vista Individual</span>
                     </a>
-                    <button type="button" class="btn-secondary" id="btn-pantalla-completa" onclick="toggleFullscreenMode()"
-                        title="Llenar los campos a pantalla completa">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                            stroke-linecap="round" stroke-linejoin="round">
+
+                    <button type="button" class="ejec-tool-btn" id="btn-pantalla-completa" onclick="toggleFullscreenMode()" title="Ampliar tabla a pantalla completa para edición rápida">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M8 3H5a2 2 0 0 0-2 2v3" />
                             <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
                             <path d="M3 16v3a2 2 0 0 0 2 2h3" />
                             <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
                         </svg>
-                        Llenar a Pantalla Completa
+                        <span>Pantalla Completa</span>
                     </button>
-                <?php endif; ?>
-                <a href="matriz.php?mes=<?php echo $mes_sel; ?>&anio=<?php echo $anio_sel; ?>" class="btn-secondary"
-                    id="btn-vista-individual" title="Ver Registro de Ejecución Individual por Partida">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                        <polyline points="14 2 14 8 20 8" />
-                        <line x1="16" y1="13" x2="8" y2="13" />
-                        <line x1="16" y1="17" x2="8" y2="17" />
-                    </svg>
-                    Vista Individual
-                </a>
-                <a href="imprimir.php?mes=<?php echo $mes_sel; ?>&anio=<?php echo $anio_sel; ?>" class="btn-print"
-                    id="btn-imprimir" target="_blank">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="6 9 6 2 18 2 18 9" />
-                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-                        <rect x="6" y="14" width="12" height="8" />
-                    </svg>
-                    Imprimir
-                </a>
-                <span class="info-badge">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10" />
-                        <line x1="12" y1="8" x2="12" y2="12" />
-                        <line x1="12" y1="16" x2="12.01" y2="16" />
-                    </svg>
-                    <?php echo count($rows); ?> partida(s) &mdash;
-                    <?php echo htmlspecialchars($nombre_mes . ' ' . $anio_sel); ?>
-                </span>
+
+                    <a href="imprimir.php?mes=<?php echo $mes_sel; ?>&anio=<?php echo $anio_sel; ?>" class="ejec-tool-btn ejec-tool-btn-print" id="btn-imprimir" target="_blank" title="Imprimir o Exportar PDF oficial">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 6 2 18 2 18 9" />
+                            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                            <rect x="6" y="14" width="12" height="8" />
+                        </svg>
+                        <span>Imprimir / PDF</span>
+                    </a>
+
+                    <?php if ($es_admin): ?>
+                        <a href="index.php?mes=<?php echo $mes_sel; ?>&anio=<?php echo $anio_sel; ?>&precargar=1"
+                            class="ejec-tool-btn ejec-tool-btn-seed" id="btn-precargar-catalogo"
+                            onclick="return confirm('¿Desea precargar las 165 partidas del catálogo presupuestario para <?php echo htmlspecialchars($nombre_mes . ' ' . $anio_sel); ?>?');"
+                            title="Precargar automáticamente las 165 partidas del catálogo oficial">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                <polyline points="7 10 12 15 17 10" />
+                                <line x1="12" y1="15" x2="12" y2="3" />
+                            </svg>
+                            <span>Precargar (165)</span>
+                        </a>
+                    <?php endif; ?>
+                </div>
             </div>
 
             <!-- ── Tabla principal ── -->
             <div class="table-wrapper">
                 <div class="table-panel-head no-print">
-                    <h2>
-                        <svg style="display:inline;vertical-align:-3px;color:#2563eb;" width="16" height="16"
-                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                            stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="3" width="18" height="18" rx="2" />
-                            <line x1="3" y1="9" x2="21" y2="9" />
-                            <line x1="3" y1="15" x2="21" y2="15" />
-                            <line x1="9" y1="3" x2="9" y2="21" />
-                            <line x1="15" y1="3" x2="15" y2="21" />
-                        </svg>
-                        &nbsp;Ejecución del Presupuesto de Gastos — Mes de
-                        <?php echo htmlspecialchars($nombre_mes . ' de ' . $anio_sel); ?>
-                    </h2>
+                    <div class="table-panel-left">
+                        <h2>
+                            <svg style="display:inline;vertical-align:-3px;color:#38bdf8;" width="16" height="16"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="2" />
+                                <line x1="3" y1="9" x2="21" y2="9" />
+                                <line x1="3" y1="15" x2="21" y2="15" />
+                                <line x1="9" y1="3" x2="9" y2="21" />
+                                <line x1="15" y1="3" x2="15" y2="21" />
+                            </svg>
+                            &nbsp;Ejecución del Presupuesto de Gastos — Mes de
+                            <?php echo htmlspecialchars($nombre_mes . ' de ' . $anio_sel); ?>
+                        </h2>
+                    </div>
+                    <div class="table-panel-right">
+                        <span class="table-meta-pill">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                            Partidas: <strong><?php echo count($rows); ?></strong>
+                        </span>
+                        <span class="table-meta-pill">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                            Año Fiscal: <strong><?php echo $anio_sel; ?></strong>
+                        </span>
+                    </div>
                 </div>
+
+                <div class="table-scroll-wrap" id="table-scroll-wrap">
 
                 <?php if (count($rows) === 0): ?>
                     <div class="sin-datos" id="empty-state-box">
@@ -1742,7 +1809,7 @@ $active = 'ejecucion';
                     <tbody id="ep-table-body">
                         <?php
                         /* Groups whose group-header label row is hidden; data rows and subtotal still show */
-                        $hidden_groups = array('GASTOS DE PERSONAL', 'MATERIALES Y SUMINISTROS');
+                        $hidden_groups = array('GASTOS DE PERSONAL', 'MATERIALES Y SUMINISTROS', 'SERVICIOS NO PERSONALES', 'TRANSFERENCIAS Y DONACIONES', 'ACTIVOS REALES');
                         ?>
                         <?php foreach ($grouped_rows as $grp_name => $grp_items): ?>
                             <?php $is_hidden_group = in_array($grp_name, $hidden_groups); ?>
@@ -1999,8 +2066,22 @@ $active = 'ejecucion';
                         </span>
                     </div>
                 <?php endif; ?>
-
+                </div><!-- /.table-scroll-wrap -->
             </div><!-- /.table-wrapper -->
+            
+            <!-- ══ FLECHAS FLOTANTES DE NAVEGACIÓN HORIZONTAL (SOLO FLECHAS) ══════ -->
+            <div id="table-horizontal-navigator" class="table-sticky-nav no-print">
+                <button type="button" id="nav-scroll-left" class="nav-btn-arrow" title="Izquierda" aria-label="Desplazar a la izquierda">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                </button>
+                <button type="button" id="nav-scroll-right" class="nav-btn-arrow" title="Derecha" aria-label="Desplazar a la derecha">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                </button>
+            </div>
 
         </main>
     </div><!-- /.layout -->
@@ -2425,23 +2506,98 @@ $active = 'ejecucion';
                     });
             }
 
-            /* ── Modo pantalla completa ── */
-            function toggleFullscreenMode() {
-                var body = document.body;
-                if (body.classList.contains('fullscreen-mode')) {
-                    body.classList.remove('fullscreen-mode');
+        </script>
+    <?php endif; ?>
+
+    <!-- ═══ SCRIPT UNIVERSAL: NAVEGADOR HORIZONTAL Y PANTALLA COMPLETA ═══════ -->
+    <script>
+        /* ── Modo pantalla completa universal ── */
+        function toggleFullscreenMode() {
+            var body = document.body;
+            if (body.classList.contains('fullscreen-mode')) {
+                body.classList.remove('fullscreen-mode');
+            } else {
+                body.classList.add('fullscreen-mode');
+            }
+        }
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && document.body.classList.contains('fullscreen-mode')) {
+                document.body.classList.remove('fullscreen-mode');
+            }
+        });
+
+        /* ── Controlador de Barra Sticky de Navegación Horizontal ── */
+        (function () {
+            var scrollWrap = document.getElementById('table-scroll-wrap');
+            var navBar = document.getElementById('table-horizontal-navigator');
+            if (!scrollWrap || !navBar) return;
+
+            var btnLeft = document.getElementById('nav-scroll-left');
+            var btnRight = document.getElementById('nav-scroll-right');
+
+            function updateNavState() {
+                var maxScroll = scrollWrap.scrollWidth - scrollWrap.clientWidth;
+                if (maxScroll <= 15) {
+                    navBar.style.display = 'none';
+                    return;
                 } else {
-                    body.classList.add('fullscreen-mode');
+                    navBar.style.display = 'flex';
+                }
+
+                var current = scrollWrap.scrollLeft;
+                if (btnLeft) {
+                    btnLeft.style.opacity = current <= 8 ? '0.3' : '1';
+                    btnLeft.style.pointerEvents = current <= 8 ? 'none' : 'auto';
+                }
+                if (btnRight) {
+                    btnRight.style.opacity = current >= maxScroll - 8 ? '0.3' : '1';
+                    btnRight.style.pointerEvents = current >= maxScroll - 8 ? 'none' : 'auto';
                 }
             }
 
-            document.addEventListener('keydown', function (e) {
-                if (e.key === 'Escape' && document.body.classList.contains('fullscreen-mode')) {
-                    document.body.classList.remove('fullscreen-mode');
-                }
-            });
-        </script>
-    <?php endif; ?>
+            scrollWrap.addEventListener('scroll', updateNavState, { passive: true });
+            window.addEventListener('resize', updateNavState);
+            setTimeout(updateNavState, 150);
+
+            function doScroll(offset) {
+                scrollWrap.scrollBy({ left: offset, behavior: 'smooth' });
+            }
+
+            var holdTimer = null;
+            var holdInterval = null;
+
+            function startHold(offset) {
+                doScroll(offset);
+                holdTimer = setTimeout(function () {
+                    holdInterval = setInterval(function () {
+                        scrollWrap.scrollLeft += (offset > 0 ? 35 : -35);
+                    }, 30);
+                }, 250);
+            }
+
+            function stopHold() {
+                if (holdTimer) clearTimeout(holdTimer);
+                if (holdInterval) clearInterval(holdInterval);
+                holdTimer = null;
+                holdInterval = null;
+            }
+
+            if (btnLeft) {
+                btnLeft.addEventListener('click', function () { doScroll(-380); });
+                btnLeft.addEventListener('mousedown', function () { startHold(-380); });
+                btnLeft.addEventListener('mouseup', stopHold);
+                btnLeft.addEventListener('mouseleave', stopHold);
+            }
+
+            if (btnRight) {
+                btnRight.addEventListener('click', function () { doScroll(380); });
+                btnRight.addEventListener('mousedown', function () { startHold(380); });
+                btnRight.addEventListener('mouseup', stopHold);
+                btnRight.addEventListener('mouseleave', stopHold);
+            }
+        })();
+    </script>
 
 </body>
 

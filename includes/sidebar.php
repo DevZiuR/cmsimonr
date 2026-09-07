@@ -436,9 +436,30 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
 
     .sidebar a.sb-link.sub-link,
     .sidebar .sb-link.sub-link {
-        padding-left: 28px !important;
+        padding-left: 32px !important;
         font-size: 13px !important;
-        color: #71717a !important;
+        color: #94a3b8 !important;
+        position: relative !important;
+    }
+
+    .sidebar a.sb-link.sub-link::before,
+    .sidebar .sb-link.sub-link::before {
+        content: '' !important;
+        position: absolute !important;
+        left: 18px !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+        width: 4px !important;
+        height: 4px !important;
+        border-radius: 50% !important;
+        background: #52525b !important;
+        transition: all 0.15s ease !important;
+    }
+
+    .sidebar a.sb-link.sub-link:hover::before,
+    .sidebar .sb-link.sub-link:hover::before {
+        background: #38bdf8 !important;
+        box-shadow: 0 0 6px rgba(56, 189, 248, 0.6) !important;
     }
 
     .sidebar a.sb-link:hover,
@@ -451,24 +472,31 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
     .sidebar .sb-link.active,
     .sidebar a.sb-link.active>span,
     .sidebar .sb-link.active>span {
-        background: #0c1524 !important;
-        color: #38bdf8 !important;
+        background: #18181b !important;
+        color: #ffffff !important;
         font-weight: 700 !important;
     }
 
     .sidebar a.sb-link.active,
     .sidebar .sb-link.active {
-        border-left: 3px solid #38bdf8 !important;
+        border-left: 3px solid #ffffff !important;
     }
 
     .sidebar a.sb-link.sub-link.active,
     .sidebar .sb-link.sub-link.active,
     .sidebar a.sb-link.sub-link.active>span,
     .sidebar .sb-link.sub-link.active>span {
-        background: #0c1524 !important;
-        color: #38bdf8 !important;
+        background: #18181b !important;
+        color: #ffffff !important;
         font-weight: 700 !important;
-        border-left: 3px solid #38bdf8 !important;
+        border-left: 3px solid #ffffff !important;
+    }
+
+    .sidebar a.sb-link.sub-link.active::before,
+    .sidebar .sb-link.sub-link.active::before {
+        background: #ffffff !important;
+        box-shadow: 0 0 6px rgba(255, 255, 255, 0.4) !important;
+        transform: translateY(-50%) scale(1.3) !important;
     }
 
     .sidebar .sb-icon {
@@ -486,7 +514,7 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
     .sidebar a.sb-link.active .sb-icon,
     .sidebar .sb-parent-label:hover .sb-icon,
     .sidebar .sb-group.open>.sb-parent-label .sb-icon {
-        color: #38bdf8 !important;
+        color: #ffffff !important;
     }
 
     /* ── User Card inferior ── */
@@ -763,14 +791,14 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
     .sidebar.collapsed a.sb-link:not(.sub-link).active,
     .sidebar.collapsed .sb-group.is-active>.sb-parent-label,
     .sidebar.collapsed .sb-group.open>.sb-parent-label {
-        background: #101a36 !important;
-        border: 1px solid #1e3a8a !important;
+        background: #18181b !important;
+        border: 1px solid #3f3f46 !important;
     }
 
     .sidebar.collapsed a.sb-link:not(.sub-link).active .sb-icon,
     .sidebar.collapsed .sb-group.is-active>.sb-parent-label .sb-icon,
     .sidebar.collapsed .sb-group.open>.sb-parent-label .sb-icon {
-        color: #60a5fa !important;
+        color: #ffffff !important;
     }
 
     .sidebar.collapsed .sb-user-card {
@@ -1162,12 +1190,12 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
                 <?php if ($es_admin): ?>
                     <a href="/sistema/src/Views/ordenes_compra/nueva_oc.php"
                         class="sb-link sub-link<?= sb_active('oc-nueva', $sb_current) ?>" id="nav-oc-nueva">
-                        <span>→ Nueva OC</span>
+                        <span>Nueva OC</span>
                     </a>
                 <?php endif; ?>
                 <a href="/sistema/src/Views/ordenes_compra/index.php"
                     class="sb-link sub-link<?= sb_active('oc-lista', $sb_current) ?>" id="nav-oc-lista">
-                    <span>→ Listado</span>
+                    <span>Listado</span>
                 </a>
             </div>
             <!-- Flyout for Collapsed Hover -->
@@ -1176,10 +1204,10 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
                 <span class="sb-flyout-desc"
                     style="padding: 0 10px 4px 10px; border-bottom: 1px solid #18181b; margin-bottom: 4px;">Gestión de
                     adquisiciones y compras</span>
+                <a href="/sistema/src/Views/ordenes_compra/index.php" class="sb-flyout-item">Listado de OC</a>
                 <?php if ($es_admin): ?>
                     <a href="/sistema/src/Views/ordenes_compra/nueva_oc.php" class="sb-flyout-item">Nueva OC</a>
                 <?php endif; ?>
-                <a href="/sistema/src/Views/ordenes_compra/index.php" class="sb-flyout-item">Listado de OC</a>
             </div>
         </div>
 
@@ -1207,21 +1235,13 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
             <div class="sb-submenu">
                 <?php if ($es_admin): ?>
                     <a href="/sistema/src/Views/ordenes_pago/nueva_op.php"
-                        class="sb-link sub-link<?= sb_active('op-nueva', $sb_current) ?>" id="nav-op-nueva">
-                        <span>→ Nueva OP</span>
-                    </a>
-                    <a href="/sistema/src/Views/ordenes_pago/nueva_op_banavih.php"
-                        class="sb-link sub-link<?= sb_active('op-banavih', $sb_current) ?>" id="nav-op-banavih">
-                        <span>→ Nueva OP BANAVIH</span>
-                    </a>
-                    <a href="/sistema/src/Views/ordenes_pago/nueva_op_ivss.php"
-                        class="sb-link sub-link<?= sb_active('op-ivss', $sb_current) ?>" id="nav-op-ivss">
-                        <span>→ Nueva OP IVSS Y PF</span>
+                        class="sb-link sub-link<?= ($sb_current === 'op-nueva' || $sb_current === 'op-banavih' || $sb_current === 'op-ivss') ? ' active' : '' ?>" id="nav-op-nueva">
+                        <span>Nueva Orden</span>
                     </a>
                 <?php endif; ?>
                 <a href="/sistema/src/Views/ordenes_pago/index.php"
                     class="sb-link sub-link<?= sb_active('op-lista', $sb_current) ?>" id="nav-op-lista">
-                    <span>→ Listado</span>
+                    <span>Listado</span>
                 </a>
             </div>
             <!-- Flyout for Collapsed Hover -->
@@ -1230,14 +1250,10 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
                 <span class="sb-flyout-desc"
                     style="padding: 0 10px 4px 10px; border-bottom: 1px solid #18181b; margin-bottom: 4px;">Emisión de
                     pagos y retenciones</span>
-                <?php if ($es_admin): ?>
-                    <a href="/sistema/src/Views/ordenes_pago/nueva_op.php" class="sb-flyout-item">Nueva OP (General)</a>
-                    <a href="/sistema/src/Views/ordenes_pago/nueva_op_banavih.php" class="sb-flyout-item">Nueva OP
-                        BANAVIH</a>
-                    <a href="/sistema/src/Views/ordenes_pago/nueva_op_ivss.php" class="sb-flyout-item">Nueva OP IVSS Y
-                        PF</a>
-                <?php endif; ?>
                 <a href="/sistema/src/Views/ordenes_pago/index.php" class="sb-flyout-item">Listado de OP</a>
+                <?php if ($es_admin): ?>
+                    <a href="/sistema/src/Views/ordenes_pago/nueva_op.php" class="sb-flyout-item">Nueva OP</a>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -1266,12 +1282,12 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
                 <?php if ($es_admin): ?>
                     <a href="/sistema/src/Views/ordenes_servicio/nueva_os.php"
                         class="sb-link sub-link<?= sb_active('os-nueva', $sb_current) ?>" id="nav-os-nueva">
-                        <span>→ Nueva OS</span>
+                        <span>Nueva OS</span>
                     </a>
                 <?php endif; ?>
                 <a href="/sistema/src/Views/ordenes_servicio/index.php"
                     class="sb-link sub-link<?= sb_active('os-lista', $sb_current) ?>" id="nav-os-lista">
-                    <span>→ Listado</span>
+                    <span>Listado</span>
                 </a>
             </div>
             <!-- Flyout for Collapsed Hover -->
@@ -1280,10 +1296,10 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
                 <span class="sb-flyout-desc"
                     style="padding: 0 10px 4px 10px; border-bottom: 1px solid #18181b; margin-bottom: 4px;">Servicios
                     técnicos y contratos</span>
+                <a href="/sistema/src/Views/ordenes_servicio/index.php" class="sb-flyout-item">Listado de OS</a>
                 <?php if ($es_admin): ?>
                     <a href="/sistema/src/Views/ordenes_servicio/nueva_os.php" class="sb-flyout-item">Nueva OS</a>
                 <?php endif; ?>
-                <a href="/sistema/src/Views/ordenes_servicio/index.php" class="sb-flyout-item">Listado de OS</a>
             </div>
         </div>
 
@@ -1318,13 +1334,13 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
                     <a href="/sistema/src/Views/proveedores/nuevo.php"
                         class="sb-link sub-link<?= sb_active('prov-nueva', $sb_current) ?><?= sb_active('prov-nuevo', $sb_current) ?>"
                         id="nav-prov-nueva">
-                        <span>→ Nuevo Proveedor</span>
+                        <span>Nuevo Proveedor</span>
                     </a>
                 <?php endif; ?>
                 <a href="/sistema/src/Views/proveedores/index.php"
                     class="sb-link sub-link<?= sb_active('prov-lista', $sb_current) ?><?= sb_active('proveedores', $sb_current) ?>"
                     id="nav-prov-lista">
-                    <span>→ Listado</span>
+                    <span>Listado</span>
                 </a>
             </div>
             <!-- Flyout for Collapsed Hover -->
@@ -1333,10 +1349,10 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
                 <span class="sb-flyout-desc"
                     style="padding: 0 10px 4px 10px; border-bottom: 1px solid #18181b; margin-bottom: 4px;">Registro de
                     proveedores y RIF</span>
+                <a href="/sistema/src/Views/proveedores/index.php" class="sb-flyout-item">Listado de Proveedores</a>
                 <?php if ($es_admin): ?>
                     <a href="/sistema/src/Views/proveedores/nuevo.php" class="sb-flyout-item">Nuevo Proveedor</a>
                 <?php endif; ?>
-                <a href="/sistema/src/Views/proveedores/index.php" class="sb-flyout-item">Listado de Proveedores</a>
             </div>
         </div>
 
@@ -1367,11 +1383,11 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
                 <div class="sb-submenu">
                     <a href="/sistema/src/Views/productos/nuevo.php"
                         class="sb-link sub-link<?= sb_active('prod-nuevo', $sb_current) ?>" id="nav-prod-nuevo">
-                        <span>→ Nuevo Producto</span>
+                        <span>Nuevo Producto</span>
                     </a>
                     <a href="/sistema/src/Views/productos/index.php"
                         class="sb-link sub-link<?= sb_active('prod-lista', $sb_current) ?>" id="nav-prod-lista">
-                        <span>→ Listado</span>
+                        <span>Listado</span>
                     </a>
                 </div>
                 <!-- Flyout for Collapsed Hover -->
@@ -1380,8 +1396,8 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
                     <span class="sb-flyout-desc"
                         style="padding: 0 10px 4px 10px; border-bottom: 1px solid #18181b; margin-bottom: 4px;">Catálogo de
                         bienes y suministros</span>
-                    <a href="/sistema/src/Views/productos/nuevo.php" class="sb-flyout-item">Nuevo Producto</a>
                     <a href="/sistema/src/Views/productos/index.php" class="sb-flyout-item">Listado de Productos</a>
+                    <a href="/sistema/src/Views/productos/nuevo.php" class="sb-flyout-item">Nuevo Producto</a>
                 </div>
             </div>
         <?php endif; ?>
@@ -1416,21 +1432,21 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
             <div class="sb-submenu">
                 <a href="/sistema/src/Views/ejecucion/listado.php"
                     class="sb-link sub-link<?= sb_active('ejecucion-lista', $sb_current) ?>" id="nav-ejecucion-listado">
-                    <span>→ Listado General</span>
+                    <span>Listado General</span>
                 </a>
                 <a href="/sistema/src/Views/ejecucion/index.php"
                     class="sb-link sub-link<?= sb_active('ejecucion', $sb_current) ?>" id="nav-ejecucion-matriz">
-                    <span>→ Reporte Mes Actual</span>
+                    <span>Reporte Mes Actual</span>
                 </a>
                 <a href="/sistema/src/Views/ejecucion/matriz.php"
                     class="sb-link sub-link<?= sb_active('ejecucion-individual', $sb_current) ?>"
                     id="nav-ejecucion-individual">
-                    <span>→ Vista Individual</span>
+                    <span>Vista Individual</span>
                 </a>
                 <?php if ($es_admin): ?>
                     <a href="/sistema/src/Views/ejecucion/nuevo.php"
                         class="sb-link sub-link<?= sb_active('ejecucion-nueva', $sb_current) ?>" id="nav-ejecucion-nueva">
-                        <span>→ Nueva Partida</span>
+                        <span>Nueva Partida</span>
                     </a>
                 <?php endif; ?>
             </div>
@@ -1511,15 +1527,15 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
                 <div class="sb-submenu">
                     <a href="/sistema/src/Views/partidas/index.php"
                         class="sb-link sub-link<?= sb_active('partidas', $sb_current) ?>" id="nav-partidas">
-                        <span>→ Partidas</span>
+                        <span>Partidas</span>
                     </a>
                     <a href="/sistema/src/Views/auditoria/index.php"
                         class="sb-link sub-link<?= sb_active('auditoria', $sb_current) ?>" id="nav-auditoria">
-                        <span>→ Auditoría</span>
+                        <span>Auditoría</span>
                     </a>
                     <a href="/sistema/src/Views/perfil/usuarios.php"
                         class="sb-link sub-link<?= sb_active('usuarios', $sb_current) ?>" id="nav-usuarios">
-                        <span>→ Usuarios</span>
+                        <span>Usuarios</span>
                     </a>
                 </div>
                 <!-- Flyout for Collapsed Hover -->

@@ -38,6 +38,21 @@ mysqli_query(
 @mysqli_query($conn, "ALTER TABLE matriz_numeros_registro ADD COLUMN monto_pago_custom DECIMAL(18,2) NULL AFTER monto_compromiso_custom");
 @mysqli_query($conn, "ALTER TABLE matriz_numeros_registro ADD COLUMN detalle_cancel_custom VARCHAR(255) NULL AFTER monto_pago_custom");
 
+/* ── Tabla auxiliar para overrides de Retención Pendiente SENIAT ── */
+mysqli_query(
+    $conn,
+    "CREATE TABLE IF NOT EXISTS matriz_retencion_overrides (
+        id           INT(11) NOT NULL AUTO_INCREMENT,
+        codificacion VARCHAR(100) NOT NULL,
+        mes          TINYINT(2) NOT NULL,
+        anio         SMALLINT(4) NOT NULL,
+        monto_custom DECIMAL(18,2) NULL,
+        updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY uk_ret_override (codificacion, mes, anio)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8"
+);
+
 /* ── Tabla auxiliar para disminuciones por OP ── */
 mysqli_query(
     $conn,
@@ -91,6 +106,36 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action'])) {
     }
 
     /* ── Guardar número de registro ── */
+        /* ── Guardar override de Retención Pendiente SENIAT ── */
+    if ($_POST['action'] === 'save_retencion_seniat') {
+        $cod = mysqli_real_escape_string($conn, isset($_POST['cod']) ? trim($_POST['cod']) : '');
+        $mes = (int) (isset($_POST['mes']) ? $_POST['mes'] : 0);
+        $anio = (int) (isset($_POST['anio']) ? $_POST['anio'] : 0);
+        $val_raw = isset($_POST['valor']) ? str_replace(array(' ', 'Bs.', 'Bs'), '', trim($_POST['valor'])) : '';
+        $monto = ($val_raw === '') ? null : (float) str_replace(',', '', $val_raw);
+
+        if ($cod && $mes && $anio) {
+            if ($monto !== null) {
+                mysqli_query(
+                    $conn,
+                    "INSERT INTO matriz_retencion_overrides (codificacion, mes, anio, monto_custom)
+                     VALUES ('$cod', $mes, $anio, $monto)
+                     ON DUPLICATE KEY UPDATE monto_custom = $monto"
+                );
+            } else {
+                mysqli_query(
+                    $conn,
+                    "DELETE FROM matriz_retencion_overrides
+                     WHERE codificacion = '$cod' AND mes = $mes AND anio = $anio"
+                );
+            }
+            echo json_encode(array('ok' => true, 'monto' => $monto));
+        } else {
+            echo json_encode(array('ok' => false, 'msg' => 'Datos incompletos'));
+        }
+        exit;
+    }
+
     if ($_POST['action'] === 'save_nr') {
         $cod = mysqli_real_escape_string($conn, isset($_POST['cod']) ? $_POST['cod'] : '');
         $op_id = (int) (isset($_POST['op_id']) ? $_POST['op_id'] : 0);
@@ -205,84 +250,170 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action'])) {
         $texto_esc = mysqli_real_escape_string($conn, $texto);
         $fecha_tr = (isset($_POST['fecha']) && !empty($_POST['fecha'])) ? trim($_POST['fecha']) : date('Y-m-d');
 
-        if (!$cod || !$mes || !$anio || !$texto_raw) {
-            echo json_encode(array('ok' => false, 'msg' => 'Datos incompletos para el traspaso'));
+        // Determinar mes y año a partir de la fecha del traspaso
+        $ts_tr = strtotime($fecha_tr);
+        if ($ts_tr !== false) {
+            $mes = (int) date('n', $ts_tr);
+            $anio = (int) date('Y', $ts_tr);
+        }
+
+        // Parsear monto del traspaso
+        $monto_raw = isset($_POST['monto']) ? trim($_POST['monto']) : '0';
+        $monto_raw = str_replace(array('Bs.', 'Bs', ' '), '', $monto_raw);
+        if (strpos($monto_raw, ',') !== false && strpos($monto_raw, '.') !== false) {
+            $monto_raw = str_replace('.', '', $monto_raw);
+            $monto_raw = str_replace(',', '.', $monto_raw);
+        } elseif (strpos($monto_raw, ',') !== false) {
+            $monto_raw = str_replace(',', '.', $monto_raw);
+        }
+        $monto_val = max(0.0, (float) $monto_raw);
+
+        if (!$texto_raw) {
+            echo json_encode(array('ok' => false, 'msg' => 'El texto del traspaso es requerido'));
             exit;
         }
 
-        // Obtener siguiente número correlativo de OP
-        $res_max_op = mysqli_query($conn, "SELECT COALESCE(MAX(CAST(numero AS UNSIGNED)), 0) + 1 AS next_num FROM ordenes_pago");
-        $max_row = $res_max_op ? mysqli_fetch_assoc($res_max_op) : null;
-        $next_num = $max_row ? (int) $max_row['next_num'] : 1;
+        $existing_op_id = (int) (isset($_POST['op_id']) ? $_POST['op_id'] : 0);
+        $new_op_id = 0;
 
-        // Crear registro en ordenes_pago para el traspaso
-        $ins_op = mysqli_query(
-            $conn,
-            "INSERT INTO ordenes_pago (numero, fecha, concepto, monto_bruto, monto_neto_pagar, estado, created_at)
-             VALUES ('$next_num', '$fecha_tr', '$texto_esc', 0.00, 0.00, 'Aprobado', NOW())"
-        );
-        $new_op_id = mysqli_insert_id($conn);
+        if ($existing_op_id > 0) {
+            $new_op_id = $existing_op_id;
+            mysqli_query($conn, "UPDATE ordenes_pago SET fecha = '$fecha_tr', concepto = '$texto_esc' WHERE id = $new_op_id");
+        } else {
+            $res_max_op = mysqli_query($conn, "SELECT COALESCE(MAX(CAST(numero AS UNSIGNED)), 0) + 1 AS next_num FROM ordenes_pago");
+            $max_row = $res_max_op ? mysqli_fetch_assoc($res_max_op) : null;
+            $next_num = $max_row ? (int) $max_row['next_num'] : 1;
+
+            $res_prov = mysqli_query($conn, "SELECT id FROM proveedores LIMIT 1");
+            $r_prov = $res_prov ? mysqli_fetch_assoc($res_prov) : null;
+            $prov_id = $r_prov ? (int)$r_prov['id'] : 1;
+
+            $ins_op = mysqli_query(
+                $conn,
+                "INSERT INTO ordenes_pago (numero, fecha, proveedor_id, doc_tipo, concepto, monto_bruto, monto_neto_pagar, status, created_at)
+                 VALUES ('$next_num', '$fecha_tr', $prov_id, 'TRASPASO', '$texto_esc', 0.00, 0.00, 'pagado', NOW())"
+            );
+            $new_op_id = mysqli_insert_id($conn);
+        }
 
         if ($new_op_id) {
-            // Guardar en matriz_numeros_registro
-            mysqli_query(
-                $conn,
-                "INSERT INTO matriz_numeros_registro (codificacion, op_id, mes, anio, detalle_custom)
-                 VALUES ('$cod', $new_op_id, $mes, $anio, '$texto_esc')
-                 ON DUPLICATE KEY UPDATE detalle_custom = '$texto_esc'"
-            );
-
             // Guardar en traspaso_registros
             mysqli_query(
                 $conn,
                 "INSERT INTO traspaso_registros (op_id, mes, anio, texto_completo)
                  VALUES ($new_op_id, $mes, $anio, '$texto_esc')
-                 ON DUPLICATE KEY UPDATE texto_completo = '$texto_esc'"
+                 ON DUPLICATE KEY UPDATE mes = $mes, anio = $anio, texto_completo = '$texto_esc'"
             );
-            $tr_id = mysqli_insert_id($conn);
-            if (!$tr_id) {
-                $r_chk = mysqli_query($conn, "SELECT id FROM traspaso_registros WHERE op_id = $new_op_id AND mes = $mes AND anio = $anio");
-                $tr_id = ($r_chk && $rc = mysqli_fetch_assoc($r_chk)) ? (int) $rc['id'] : 0;
+            $r_chk = mysqli_query($conn, "SELECT id FROM traspaso_registros WHERE op_id = $new_op_id LIMIT 1");
+            $tr_id = ($r_chk && $rc = mysqli_fetch_assoc($r_chk)) ? (int) $rc['id'] : 0;
+
+            // Obtener listas de partidas
+            $orig_codes = array();
+            $dest_codes = array();
+
+            if (!empty($_POST['from_codes'])) {
+                foreach (explode(',', $_POST['from_codes']) as $c) {
+                    $c = trim($c, " \t\n\r\0\x0B;:,.");
+                    if ($c !== '') $orig_codes[] = $c;
+                }
+            }
+            if (!empty($_POST['to_codes'])) {
+                foreach (explode(',', $_POST['to_codes']) as $c) {
+                    $c = trim($c, " \t\n\r\0\x0B;:,.");
+                    if ($c !== '') $dest_codes[] = $c;
+                }
             }
 
-            if ($tr_id) {
-                // Parsear partidas DE y A
-                $orig_codes = array();
-                if (preg_match('/DE LAS PARTIDAS;\s*(.*?)\s+A LAS PARTIDA/si', $texto, $mFrom)) {
+            // Fallback con regex flexible
+            if (empty($orig_codes)) {
+                if (preg_match('/DE LAS? PARTIDAS?[;:\s]+(.*?)(?=\s+A LAS? PARTIDAS?|$)/si', $texto, $mFrom)) {
                     foreach (explode(',', $mFrom[1]) as $c) {
-                        $c = trim($c);
-                        if ($c !== '')
-                            $orig_codes[] = $c;
+                        $c = trim($c, " \t\n\r\0\x0B;:,.");
+                        if ($c !== '') $orig_codes[] = $c;
                     }
                 }
-                $dest_codes = array();
-                if (preg_match('/A LAS PARTIDAS?\s+(.*?)$/si', $texto, $mTo)) {
+            }
+            if (empty($dest_codes)) {
+                if (preg_match('/A LAS? PARTIDAS?[;:\s]+(.*?)$/si', $texto, $mTo)) {
                     foreach (explode(',', $mTo[1]) as $c) {
-                        $c = trim($c);
-                        if ($c !== '')
-                            $dest_codes[] = $c;
+                        $c = trim($c, " \t\n\r\0\x0B;:,.");
+                        if ($c !== '') $dest_codes[] = $c;
                     }
                 }
-                foreach ($orig_codes as $oc) {
-                    $oc_esc = mysqli_real_escape_string($conn, $oc);
+            }
+
+            // Limpiar traspaso_partidas anteriores para este traspaso_id
+            if ($tr_id) {
+                mysqli_query($conn, "DELETE FROM traspaso_partidas WHERE traspaso_id = $tr_id");
+            }
+
+            // Registrar partidas de origen (disminución)
+            foreach (array_unique($orig_codes) as $oc) {
+                $oc_esc = mysqli_real_escape_string($conn, $oc);
+                if ($tr_id) {
                     mysqli_query(
                         $conn,
                         "INSERT INTO traspaso_partidas (traspaso_id, codificacion, tipo, monto)
-                         VALUES ($tr_id, '$oc_esc', 'origen', 0)
-                         ON DUPLICATE KEY UPDATE tipo = 'origen'"
+                         VALUES ($tr_id, '$oc_esc', 'origen', $monto_val)"
                     );
                 }
-                foreach ($dest_codes as $dc) {
-                    $dc_esc = mysqli_real_escape_string($conn, $dc);
+                $vars_oc = get_matching_code_variants($oc);
+                foreach ($vars_oc as $voc) {
+                    $voc_esc = mysqli_real_escape_string($conn, $voc);
+                    mysqli_query(
+                        $conn,
+                        "INSERT INTO matriz_numeros_registro (codificacion, op_id, mes, anio, detalle_custom)
+                         VALUES ('$voc_esc', $new_op_id, $mes, $anio, '$texto_esc')
+                         ON DUPLICATE KEY UPDATE detalle_custom = '$texto_esc'"
+                    );
+                    if ($monto_val > 0) {
+                        mysqli_query(
+                            $conn,
+                            "INSERT INTO matriz_disminuciones (codificacion, op_id, mes, anio, disminucion)
+                             VALUES ('$voc_esc', $new_op_id, $mes, $anio, $monto_val)
+                             ON DUPLICATE KEY UPDATE disminucion = $monto_val"
+                        );
+                    }
+                }
+            }
+
+            // Registrar partidas de destino (aumento)
+            foreach (array_unique($dest_codes) as $dc) {
+                $dc_esc = mysqli_real_escape_string($conn, $dc);
+                if ($tr_id) {
                     mysqli_query(
                         $conn,
                         "INSERT INTO traspaso_partidas (traspaso_id, codificacion, tipo, monto)
-                         VALUES ($tr_id, '$dc_esc', 'destino', 0)
-                         ON DUPLICATE KEY UPDATE tipo = 'destino'"
+                         VALUES ($tr_id, '$dc_esc', 'destino', $monto_val)"
+                    );
+                }
+                $vars_dc = get_matching_code_variants($dc);
+                foreach ($vars_dc as $vdc) {
+                    $vdc_esc = mysqli_real_escape_string($conn, $vdc);
+                    mysqli_query(
+                        $conn,
+                        "INSERT INTO matriz_numeros_registro (codificacion, op_id, mes, anio, detalle_custom)
+                         VALUES ('$vdc_esc', $new_op_id, $mes, $anio, '$texto_esc')
+                         ON DUPLICATE KEY UPDATE detalle_custom = '$texto_esc'"
                     );
                 }
             }
-            echo json_encode(array('ok' => true, 'op_id' => $new_op_id));
+
+            // Vincular también a la partida actual si fue seleccionada
+            if ($cod) {
+                $vars_cur = get_matching_code_variants($cod);
+                foreach ($vars_cur as $vcur) {
+                    $vcur_esc = mysqli_real_escape_string($conn, $vcur);
+                    mysqli_query(
+                        $conn,
+                        "INSERT INTO matriz_numeros_registro (codificacion, op_id, mes, anio, detalle_custom)
+                         VALUES ('$vcur_esc', $new_op_id, $mes, $anio, '$texto_esc')
+                         ON DUPLICATE KEY UPDATE detalle_custom = '$texto_esc'"
+                    );
+                }
+            }
+
+            echo json_encode(array('ok' => true, 'op_id' => $new_op_id, 'mes' => $mes, 'anio' => $anio));
         } else {
             echo json_encode(array('ok' => false, 'msg' => 'Error al crear la orden de traspaso'));
         }
@@ -967,7 +1098,7 @@ $res_nr_all = mysqli_query(
     $conn,
     "SELECT op_id, mes, numero_reg, detalle_custom, monto_compromiso_custom, monto_pago_custom, detalle_cancel_custom 
      FROM matriz_numeros_registro
-     WHERE codificacion = '$cod_esc' AND anio = $anio_sel"
+     WHERE codificacion IN ($in_clause) AND anio = $anio_sel"
 );
 if ($res_nr_all) {
     while ($nr = mysqli_fetch_assoc($res_nr_all)) {
@@ -993,7 +1124,7 @@ if ($res_nr_all) {
 $res_dismin = mysqli_query(
     $conn,
     "SELECT op_id, disminucion FROM matriz_disminuciones
-     WHERE codificacion = '$cod_esc' AND mes = $mes_sel AND anio = $anio_sel"
+     WHERE codificacion IN ($in_clause) AND mes = $mes_sel AND anio = $anio_sel"
 );
 if ($res_dismin) {
     while ($drow = mysqli_fetch_assoc($res_dismin)) {
@@ -1026,10 +1157,10 @@ $res_trp = mysqli_query(
             op.fecha, op.numero
      FROM traspaso_partidas tp
      JOIN traspaso_registros tr ON tr.id = tp.traspaso_id
-     JOIN ordenes_pago op ON op.id = tr.op_id
+     LEFT JOIN ordenes_pago op ON op.id = tr.op_id
      WHERE tp.codificacion IN ($in_clause)
        AND tr.mes = $mes_sel AND tr.anio = $anio_sel
-     ORDER BY op.fecha ASC, op.id ASC"
+     ORDER BY COALESCE(op.fecha, tr.updated_at) ASC, tr.id ASC"
 );
 if ($res_trp) {
     while ($trow = mysqli_fetch_assoc($res_trp)) {
@@ -1183,6 +1314,18 @@ if ($es_partida_iva && $mes_sel > 1) {
         }
     }
     $retencion_pendiente_mes_ant = max(0.0, $ant_comp_acum - $ant_gc_acum);
+    /* Si el mes anterior tenía un override manual de retención pendiente, usarlo */
+    $cod_esc_ant_ovr = mysqli_real_escape_string($conn, $cod_sel);
+    $res_ant_ovr = mysqli_query(
+        $conn,
+        "SELECT monto_custom FROM matriz_retencion_overrides
+         WHERE codificacion = '$cod_esc_ant_ovr' AND mes = $mes_ant AND anio = $anio_sel LIMIT 1"
+    );
+    if ($res_ant_ovr && $row_aovr = mysqli_fetch_assoc($res_ant_ovr)) {
+        if ($row_aovr['monto_custom'] !== null) {
+            $retencion_pendiente_mes_ant = (float) $row_aovr['monto_custom'];
+        }
+    }
 }
 
 if ($es_partida_iva) {
@@ -3258,7 +3401,17 @@ $active = 'ejecucion-individual';
             <?php if ($es_partida_iva): ?>
                 <?php
                 /* Retención pendiente al cierre del mes seleccionado */
-                $retencion_pendiente_actual = max(0.0, $comp_acumulado - $gc_acumulado_iva);
+                $retencion_calc = max(0.0, $comp_acumulado - $gc_acumulado_iva);
+                $cod_esc_ret = mysqli_real_escape_string($conn, $cod_sel);
+                $res_ret_ovr = mysqli_query(
+                    $conn,
+                    "SELECT monto_custom FROM matriz_retencion_overrides
+                     WHERE codificacion = '$cod_esc_ret' AND mes = $mes_sel AND anio = $anio_sel LIMIT 1"
+                );
+                $ret_ovr_row = ($res_ret_ovr) ? mysqli_fetch_assoc($res_ret_ovr) : null;
+                $retencion_custom_override = ($ret_ovr_row && $ret_ovr_row['monto_custom'] !== null) ? (float) $ret_ovr_row['monto_custom'] : null;
+                $retencion_pendiente_actual = ($retencion_custom_override !== null) ? $retencion_custom_override : $retencion_calc;
+
                 $mes_sig_num = ($mes_sel < 12) ? ($mes_sel + 1) : 1;
                 $anio_sig = ($mes_sel < 12) ? $anio_sel : ($anio_sel + 1);
                 $meses_es_iva = array(
@@ -3278,46 +3431,109 @@ $active = 'ejecucion-individual';
                 $nombre_mes_sig = (isset($meses_es_iva[$mes_sig_num]) ? $meses_es_iva[$mes_sig_num] : $mes_sig_num) . ' ' . $anio_sig;
                 ?>
                 <div class="iva-retencion-box no-print" id="iva-retencion-box" style="
-                max-width:1380px;
-                margin-top:14px;
-                margin-bottom:18px;
-                background:linear-gradient(135deg,#1e3a5f 0%,#1e40af 100%);
-                border-radius:12px;
-                padding:18px 28px;
-                display:flex;
-                align-items:center;
-                gap:28px;
-                box-shadow:0 4px 18px rgba(30,64,175,.35);
-                flex-wrap:wrap;
-            ">
-                    <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:260px;">
+                    max-width: 1380px;
+                    margin: 8px 0 14px 0;
+                    background: #f1f5f9;
+                    border: 1px solid #cbd5e1;
+                    border-left: 4px solid #0f172a;
+                    border-radius: 8px;
+                    padding: 8px 16px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 16px;
+                    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+                    flex-wrap: wrap;
+                ">
+                    <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 240px;">
                         <div style="
-                        width:44px;height:44px;border-radius:50%;
-                        background:rgba(255,255,255,.15);
-                        display:flex;align-items:center;justify-content:center;
-                        font-size:22px;
-                        flex-shrink:0;
-                    ">&#9888;</div>
+                            width: 28px; height: 28px; border-radius: 6px;
+                            background: #ffffff; border: 1px solid #cbd5e1;
+                            display: flex; align-items: center; justify-content: center;
+                            color: #0f172a; flex-shrink: 0;
+                        ">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                                <line x1="12" y1="9" x2="12" y2="13"/>
+                                <line x1="12" y1="17" x2="12.01" y2="17"/>
+                            </svg>
+                        </div>
                         <div>
-                            <div
-                                style="font-size:10.5px;font-weight:700;color:#93c5fd;text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px;">
-                                Retenci&#243;n Pendiente por Enterar al SENIAT</div>
-                            <div style="font-size:12px;color:rgba(255,255,255,.8);">
-                                en <strong style="color:#fff;"><?php echo htmlspecialchars($nombre_mes_sig); ?></strong>
+                            <div style="font-size: 11px; font-weight: 700; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                <span>Retenci&#243;n Pendiente por Enterar al SENIAT</span>
+                                <span style="font-size: 10px; font-weight: 600; color: #475569; background: #ffffff; border: 1px solid #cbd5e1; padding: 1px 6px; border-radius: 4px; text-transform: none;">
+                                    en <?php echo htmlspecialchars($nombre_mes_sig); ?>
+                                </span>
+                            </div>
+                            <div style="font-size: 10px; color: #64748b; margin-top: 1px;">
+                                F&#243;rmula: Comprometido Acumulado (<?php echo fmt_m($comp_acumulado); ?>) &minus; Causado Acumulado (<?php echo fmt_m($gc_acumulado_iva); ?>)
+                                <span id="badge-retencion-manual" style="<?php echo ($retencion_custom_override !== null) ? 'display:inline-block;' : 'display:none;'; ?> margin-left: 6px; color: #0f172a; font-weight: 600; font-size: 9.5px; background: #ffffff; border: 1px solid #cbd5e1; padding: 0 5px; border-radius: 3px;">
+                                    Modificado manualmente (Auto: <?php echo fmt_m($retencion_calc); ?>)
+                                </span>
                             </div>
                         </div>
                     </div>
-                    <div style="text-align:right;">
-                        <div
-                            style="font-size:10px;color:#93c5fd;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px;">
-                            Monto</div>
-                        <div style="font-size:26px;font-weight:800;color:#fff;letter-spacing:.5px;font-variant-numeric:tabular-nums;"
-                            id="iva-retencion-monto">
-                            Bs.&nbsp;<?php echo fmt_m($retencion_pendiente_actual); ?>
-                        </div>
-                        <div style="font-size:9.5px;color:rgba(255,255,255,.55);margin-top:4px;">
-                            = Comprometido Acumulado (<?php echo fmt_m($comp_acumulado); ?>)
-                            &minus; Causado Acumulado (<?php echo fmt_m($gc_acumulado_iva); ?>)
+
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div style="text-align: right;">
+                            <span style="font-size: 9px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 2px;">Monto</span>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="font-size: 12px; font-weight: 700; color: #0f172a;">Bs.</span>
+                                <?php if ($es_admin): ?>
+                                    <input type="text"
+                                           id="retencion-seniat-custom-input"
+                                           class="mat-num-input"
+                                           value="<?php echo fmt_m($retencion_pendiente_actual); ?>"
+                                           placeholder="<?php echo fmt_m($retencion_calc); ?>"
+                                           data-cod="<?php echo htmlspecialchars($cod_sel); ?>"
+                                           data-mes="<?php echo $mes_sel; ?>"
+                                           data-anio="<?php echo $anio_sel; ?>"
+                                           data-calc-val="<?php echo fmt_m($retencion_calc); ?>"
+                                           title="Monto editable. Haz clic para modificar. Presiona Enter o sal del campo para guardar."
+                                           style="
+                                               font-size: 14px;
+                                               font-weight: 800;
+                                               color: #0f172a;
+                                               width: 140px;
+                                               text-align: right;
+                                               padding: 3px 8px;
+                                               border: 1px solid #cbd5e1;
+                                               border-radius: 6px;
+                                               background: #ffffff;
+                                               font-variant-numeric: tabular-nums;
+                                           ">
+                                    <button type="button"
+                                            id="btn-reset-retencion"
+                                            onclick="resetRetencionCalculada()"
+                                            title="Restaurar c&#225;lculo autom&#225;tico (<?php echo fmt_m($retencion_calc); ?>)"
+                                            style="
+                                                background: #ffffff;
+                                                border: 1px solid #cbd5e1;
+                                                border-radius: 6px;
+                                                color: #475569;
+                                                padding: 4px 8px;
+                                                cursor: pointer;
+                                                font-size: 11px;
+                                                display: flex;
+                                                align-items: center;
+                                                gap: 4px;
+                                                height: 27px;
+                                                transition: background 0.15s, border-color 0.15s;
+                                            "
+                                            onmouseover="this.style.background='#f1f5f9';this.style.borderColor='#94a3b8';"
+                                            onmouseout="this.style.background='#f8fafc';this.style.borderColor='#cbd5e1';">
+                                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                            <polyline points="1 4 1 10 7 10"></polyline>
+                                            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                                        </svg>
+                                        <span style="font-size: 10px; font-weight: 600;">Auto</span>
+                                    </button>
+                                <?php else: ?>
+                                    <span style="font-size: 15px; font-weight: 800; color: #0f172a; font-variant-numeric: tabular-nums;">
+                                        <?php echo fmt_m($retencion_pendiente_actual); ?>
+                                    </span>
+                                <?php endif; ?>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -3790,6 +4006,95 @@ $active = 'ejecucion-individual';
                 if (printVal) printVal.style.display = 'none';
             })();
 
+            
+            /* ── Auto-guardado de Retención Pendiente SENIAT ── */
+            (function () {
+                var retInput = document.getElementById('retencion-seniat-custom-input');
+                if (!retInput) return;
+
+                function formatMoneyString(raw) {
+                    if (raw === null || raw === undefined) return '';
+                    var str = raw.toString().trim();
+                    if (str === '') return '';
+                    if (str.indexOf(',') !== -1 && str.indexOf('.') !== -1) {
+                        str = str.replace(/,/g, '');
+                    } else if (str.indexOf(',') !== -1) {
+                        str = str.replace(/,/g, '.');
+                    }
+                    var num = parseFloat(str);
+                    if (isNaN(num)) return '';
+                    return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                }
+
+                function saveRetencionCustom(input, isReset) {
+                    var cod = input.getAttribute('data-cod');
+                    var mes = input.getAttribute('data-mes');
+                    var anio = input.getAttribute('data-anio');
+                    var rawVal = isReset ? '' : input.value.trim();
+
+                    if (!isReset && rawVal !== '') {
+                        var formatted = formatMoneyString(rawVal);
+                        if (formatted !== '') {
+                            input.value = formatted;
+                            rawVal = formatted;
+                        }
+                    }
+
+                    input.classList.add('saving');
+                    var xhr = new XMLHttpRequest();
+                    xhr.open('POST', 'matriz.php', true);
+                    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                    xhr.onreadystatechange = function () {
+                        if (xhr.readyState === 4) {
+                            input.classList.remove('saving');
+                            try {
+                                var resp = JSON.parse(xhr.responseText);
+                                if (resp.ok) {
+                                    input.classList.add('saved');
+                                    var badge = document.getElementById('badge-retencion-manual');
+                                    if (isReset) {
+                                        input.value = input.getAttribute('data-calc-val');
+                                        if (badge) badge.style.display = 'none';
+                                    } else {
+                                        if (badge) badge.style.display = 'inline-block';
+                                    }
+                                    setTimeout(function () { input.classList.remove('saved'); }, 1500);
+                                }
+                            } catch (e) { }
+                        }
+                    };
+                    xhr.send(
+                        'action=save_retencion_seniat'
+                        + '&cod=' + encodeURIComponent(cod)
+                        + '&mes=' + encodeURIComponent(mes)
+                        + '&anio=' + encodeURIComponent(anio)
+                        + '&valor=' + encodeURIComponent(rawVal)
+                    );
+                }
+
+                retInput.addEventListener('focus', function () {
+                    setTimeout(function () { retInput.select(); }, 50);
+                });
+
+                retInput.addEventListener('blur', function () {
+                    saveRetencionCustom(retInput, false);
+                });
+
+                retInput.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        retInput.blur();
+                    }
+                });
+
+                window.resetRetencionCalculada = function () {
+                    if (!confirm('¿Desea restaurar el cálculo automático de retención pendiente (' + retInput.getAttribute('data-calc-val') + ')?')) {
+                        return;
+                    }
+                    saveRetencionCustom(retInput, true);
+                };
+            })();
+
             function guardarCredito() {
                 var input = document.getElementById('credito-original-input');
                 var status = document.getElementById('credito-status');
@@ -3916,33 +4221,49 @@ $active = 'ejecucion-individual';
     <div id="traspaso-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="traspaso-title">
         <div class="trm-header">
             <div>
-                <span class="trm-icon">⇄</span>
-                <span id="traspaso-title">Asistente de Traspaso de Crédito Presupuestario</span>
+                <div class="trm-icon-badge">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M7 16V4m0 0L3 8m4-4l4 4m6 4v12m0 0l4-4m-4 4l-4-4"/>
+                    </svg>
+                </div>
+                <span id="traspaso-title">Asistente de Traspaso de Cr&eacute;dito Presupuestario</span>
             </div>
-            <button class="trm-close" onclick="closeTraspasoModal()" title="Cerrar">✕</button>
+            <button class="trm-close" onclick="closeTraspasoModal()" title="Cerrar" aria-label="Cerrar">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
         </div>
 
         <div class="trm-body">
-            <!-- Fila 1: N° Resolución + Fecha -->
-            <div class="trm-row2">
+            <!-- Fila 1: Nº Resolución + Fecha -->
+            <div class="trm-row3">
                 <div class="trm-field">
-                    <label class="trm-label" for="trm-resolucion">N° de Resolución</label>
+                    <label class="trm-label" for="trm-resolucion">N&ordm; de Resoluci&oacute;n</label>
                     <input type="text" id="trm-resolucion" class="trm-input" placeholder="ej: 016-2026"
                         oninput="updateTraspasoPreview()">
                 </div>
                 <div class="trm-field">
                     <label class="trm-label" for="trm-fecha">Fecha</label>
-                    <input type="date" id="trm-fecha" class="trm-input" value="<?php echo date('Y-m-d'); ?>"
+                    <input type="date" id="trm-fecha" class="trm-input" value="<?php echo sprintf('%04d-%02d-01', $anio_sel, $mes_sel); ?>"
                         oninput="updateTraspasoPreview()">
+                </div>
+                <div class="trm-field">
+                    <label class="trm-label" for="trm-monto">Monto Traspaso (Bs.)</label>
+                    <input type="text" id="trm-monto" class="trm-input" placeholder="ej: 35.000,00"
+                        style="font-family:monospace;font-weight:600;" oninput="formatTraspasoMonto(this)">
                 </div>
             </div>
 
             <!-- DE LAS PARTIDAS -->
-            <div class="trm-field" style="margin-top:10px;">
-                <label class="trm-label">DE LAS PARTIDAS <span class="trm-hint">(Partidas de origen — selección
-                        múltiple)</span></label>
+            <div class="trm-field">
+                <label class="trm-label">
+                    <span>DE LAS PARTIDAS</span>
+                    <span class="trm-hint">(Partidas de origen &mdash; selecci&oacute;n m&uacute;ltiple)</span>
+                </label>
                 <div class="trm-picker-wrap">
-                    <input type="text" id="trm-search-from" class="trm-search" placeholder="Buscar partida de origen…"
+                    <input type="text" id="trm-search-from" class="trm-search" placeholder="Buscar partida de origen..."
                         oninput="filterTraspasoList('from')">
                     <div id="trm-list-from" class="trm-list">
                         <?php foreach ($catalogo as $ci):
@@ -3962,10 +4283,13 @@ $active = 'ejecucion-individual';
             </div>
 
             <!-- A LAS PARTIDAS -->
-            <div class="trm-field" style="margin-top:10px;">
-                <label class="trm-label">A LAS PARTIDA(S) <span class="trm-hint">(Partidas de destino)</span></label>
+            <div class="trm-field">
+                <label class="trm-label">
+                    <span>A LAS PARTIDA(S)</span>
+                    <span class="trm-hint">(Partidas de destino)</span>
+                </label>
                 <div class="trm-picker-wrap">
-                    <input type="text" id="trm-search-to" class="trm-search" placeholder="Buscar partida de destino…"
+                    <input type="text" id="trm-search-to" class="trm-search" placeholder="Buscar partida de destino..."
                         oninput="filterTraspasoList('to')">
                     <div id="trm-list-to" class="trm-list">
                         <?php foreach ($catalogo as $ci):
@@ -3984,33 +4308,49 @@ $active = 'ejecucion-individual';
                 <div id="trm-tags-to" class="trm-tags"></div>
             </div>
 
-            <!-- Preview del texto generado -->
-            <div class="trm-preview-wrap" style="margin-top:12px;">
-                <label class="trm-label">Vista Previa del Texto</label>
-                <div id="trm-preview" class="trm-preview">Completa los campos para ver el texto generado…</div>
+            <!-- Preview del texto generado (Editable manualmente) -->
+            <div class="trm-preview-wrap">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
+                    <label class="trm-label" for="trm-preview" style="margin-bottom:0;">Vista Previa del Texto Generado</label>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span id="trm-manual-badge" style="display:none;font-size:9.5px;font-weight:600;color:#0f172a;background:#e2e8f0;border:1px solid #cbd5e1;padding:1px 6px;border-radius:4px;">Editado manualmente</span>
+                        <button type="button" onclick="regenerarTraspasoText()" title="Regenerar desde los campos del asistente" style="background:none;border:none;color:#64748b;font-size:10.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:3px;padding:2px 4px;border-radius:4px;" onmouseover="this.style.color='#0f172a';this.style.background='#e2e8f0'" onmouseout="this.style.color='#64748b';this.style.background='none'">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+                            <span>Regenerar</span>
+                        </button>
+                    </div>
+                </div>
+                <textarea id="trm-preview" class="trm-preview" rows="3" placeholder="Completa los campos para ver el texto generado o escribe/edita directamente aqu&iacute;..."></textarea>
             </div>
         </div>
 
         <div class="trm-footer">
             <button type="button" id="trm-btn-delete" class="trm-btn-delete" style="display:none;"
                 onclick="eliminarTraspasoDesdeModal()">
-                🗑 Eliminar Traspaso
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                <span>Eliminar Traspaso</span>
             </button>
-            <button class="trm-btn-cancel" onclick="closeTraspasoModal()">Cancelar</button>
-            <button class="trm-btn-apply" onclick="applyTraspasoText()">
-                ✓ Insertar en Detalle
+            <button type="button" class="trm-btn-cancel" onclick="closeTraspasoModal()">Cancelar</button>
+            <button type="button" class="trm-btn-apply" onclick="applyTraspasoText()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>Insertar en Detalle</span>
             </button>
         </div>
     </div>
 
     <style>
-        /* ── Traspaso Modal ── */
+        /* ── Traspaso Modal (Cleaner, Modern, Spaced, Black Header/CTA & Gray Data Bg) ── */
         #traspaso-overlay {
             position: fixed;
             inset: 0;
-            background: rgba(15, 23, 42, .55);
+            background: rgba(15, 23, 42, .65);
             z-index: 20000;
-            backdrop-filter: blur(3px);
+            backdrop-filter: blur(4px);
         }
 
         #traspaso-modal {
@@ -4019,25 +4359,28 @@ $active = 'ejecucion-individual';
             left: 50%;
             transform: translate(-50%, -50%);
             z-index: 20001;
-            width: 680px;
-            max-width: 96vw;
+            width: 700px;
+            max-width: 95vw;
             max-height: 90vh;
-            background: #fff;
-            border-radius: 14px;
-            box-shadow: 0 24px 60px -10px rgba(15, 23, 42, .35), 0 8px 24px -6px rgba(15, 23, 42, .18);
+            background: #ffffff;
+            border-radius: 12px;
+            border: 1px solid #27272a;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.08);
             display: flex;
             flex-direction: column;
             overflow: hidden;
             font-family: 'Inter', sans-serif;
         }
 
+        /* TOP: Keep Background Black */
         .trm-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 14px 18px;
-            background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
-            color: #fff;
+            padding: 13px 20px;
+            background: #09090b;
+            border-bottom: 1px solid #27272a;
+            color: #ffffff;
             flex-shrink: 0;
         }
 
@@ -4045,145 +4388,177 @@ $active = 'ejecucion-individual';
             display: flex;
             align-items: center;
             gap: 10px;
-            font-size: 13px;
+            font-size: 13.5px;
             font-weight: 700;
-            letter-spacing: .3px;
+            letter-spacing: .2px;
+            color: #ffffff;
         }
 
-        .trm-icon {
-            font-size: 20px;
-        }
-
-        .trm-close {
-            background: rgba(255, 255, 255, .15);
-            border: none;
-            color: #fff;
+        .trm-icon-badge {
             width: 28px;
             height: 28px;
-            border-radius: 50%;
-            cursor: pointer;
-            font-size: 14px;
+            border-radius: 6px;
+            background: #18181b;
+            border: 1px solid #27272a;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: background .15s;
+            color: #ffffff;
+            flex-shrink: 0;
+        }
+
+        .trm-close {
+            background: #18181b;
+            border: 1px solid #27272a;
+            color: #a1a1aa;
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all .15s;
         }
 
         .trm-close:hover {
-            background: rgba(255, 255, 255, .3);
+            background: #27272a;
+            color: #ffffff;
+            border-color: #3f3f46;
         }
 
+        /* DATA BACKGROUND: Soft Clean Gray (#f8fafc) */
         .trm-body {
-            padding: 16px 18px;
+            padding: 18px 22px;
             overflow-y: auto;
             flex: 1;
+            background: #f8fafc;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
         }
 
         .trm-row2 {
             display: grid;
             grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+
+        .trm-row3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1.2fr;
             gap: 12px;
         }
 
         .trm-field {
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 5px;
         }
 
         .trm-label {
-            font-size: 10.5px;
+            font-size: 11px;
             font-weight: 700;
-            color: #374151;
+            color: #0f172a;
             text-transform: uppercase;
-            letter-spacing: .5px;
+            letter-spacing: .4px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
         .trm-hint {
-            font-size: 9.5px;
-            color: #6b7280;
-            font-weight: 400;
+            font-size: 10px;
+            color: #64748b;
+            font-weight: 500;
             text-transform: none;
             letter-spacing: 0;
         }
 
         .trm-input {
-            padding: 7px 10px;
-            border: 1.5px solid #d1d5db;
+            padding: 8px 12px;
+            border: 1.5px solid #cbd5e1;
             border-radius: 7px;
-            font-size: 12px;
+            font-size: 12.5px;
             font-family: inherit;
-            color: #1e293b;
-            transition: border .15s;
+            color: #0f172a;
+            background: #ffffff;
+            transition: border-color .15s, box-shadow .15s;
             outline: none;
         }
 
         .trm-input:focus {
-            border-color: #2563eb;
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
+            border-color: #09090b;
+            box-shadow: 0 0 0 3px rgba(9, 9, 11, .08);
         }
 
         .trm-picker-wrap {
-            border: 1.5px solid #d1d5db;
+            border: 1.5px solid #cbd5e1;
             border-radius: 8px;
             overflow: hidden;
+            background: #ffffff;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
         }
 
         .trm-search {
             width: 100%;
-            padding: 7px 10px;
+            padding: 8px 12px;
             border: none;
-            border-bottom: 1px solid #e5e7eb;
-            font-size: 11px;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 11.5px;
             font-family: inherit;
             outline: none;
-            background: #f8fafc;
+            background: #f1f5f9;
+            color: #0f172a;
             box-sizing: border-box;
+            transition: background .15s;
         }
 
         .trm-search:focus {
-            background: #eff6ff;
+            background: #ffffff;
         }
 
         .trm-list {
-            max-height: 140px;
+            max-height: 135px;
             overflow-y: auto;
             padding: 4px 0;
+            background: #ffffff;
         }
 
         .trm-item {
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 5px 10px;
+            gap: 10px;
+            padding: 6px 12px;
             cursor: pointer;
             transition: background .1s;
-            font-size: 11px;
+            font-size: 11.5px;
+            user-select: none;
         }
 
         .trm-item:hover {
-            background: #eff6ff;
+            background: #f1f5f9;
         }
 
         .trm-item input[type=checkbox] {
-            accent-color: #2563eb;
-            width: 14px;
-            height: 14px;
+            accent-color: #09090b;
+            width: 15px;
+            height: 15px;
             flex-shrink: 0;
             cursor: pointer;
         }
 
         .trm-item-code {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 10px;
+            font-size: 11px;
             font-weight: 700;
-            color: #1e40af;
+            color: #0f172a;
             white-space: nowrap;
         }
 
         .trm-item-denom {
-            color: #4b5563;
-            font-size: 10.5px;
+            color: #475569;
+            font-size: 11px;
         }
 
         .trm-item.hidden {
@@ -4193,66 +4568,83 @@ $active = 'ejecucion-individual';
         .trm-tags {
             display: flex;
             flex-wrap: wrap;
-            gap: 4px;
-            margin-top: 5px;
+            gap: 5px;
+            margin-top: 3px;
             min-height: 0;
         }
 
         .trm-tag {
             display: inline-flex;
             align-items: center;
-            gap: 4px;
-            padding: 2px 8px;
-            background: #dbeafe;
-            color: #1e40af;
-            border-radius: 100px;
-            font-size: 10px;
+            gap: 5px;
+            padding: 3px 9px;
+            background: #e2e8f0;
+            color: #0f172a;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 10.5px;
             font-weight: 700;
             font-family: 'JetBrains Mono', monospace;
         }
 
         .trm-tag-x {
             cursor: pointer;
-            font-size: 11px;
+            font-size: 12px;
             line-height: 1;
-            opacity: .7;
+            color: #64748b;
+            transition: color .15s;
         }
 
         .trm-tag-x:hover {
-            opacity: 1;
+            color: #ef4444;
         }
 
-        .trm-preview-wrap .trm-label {
-            margin-bottom: 4px;
+        .trm-preview-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
         }
 
+        /* Preview box with soft data gray background */
         .trm-preview {
-            background: #f0f4ff;
-            border: 1.5px solid #bfdbfe;
+            background: #f1f5f9;
+            border: 1.5px solid #cbd5e1;
             border-radius: 8px;
             padding: 10px 12px;
             font-size: 11.5px;
-            color: #1e293b;
+            color: #0f172a;
             line-height: 1.6;
-            white-space: pre-wrap;
-            min-height: 48px;
+            min-height: 58px;
             font-weight: 500;
+            font-family: 'JetBrains Mono', monospace, sans-serif;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.03);
+            width: 100%;
+            box-sizing: border-box;
+            resize: vertical;
+            outline: none;
+            transition: border-color .15s, background .15s, box-shadow .15s;
+        }
+
+        .trm-preview:focus {
+            background: #ffffff;
+            border-color: #09090b;
+            box-shadow: 0 0 0 3px rgba(9, 9, 11, .08);
         }
 
         .trm-footer {
             display: flex;
             justify-content: flex-end;
-            gap: 8px;
-            padding: 12px 18px;
-            border-top: 1px solid #e5e7eb;
+            gap: 10px;
+            padding: 13px 22px;
+            border-top: 1px solid #e2e8f0;
             flex-shrink: 0;
-            background: #f8fafc;
+            background: #ffffff;
         }
 
         .trm-btn-delete {
-            padding: 8px 16px;
-            border: 1.5px solid #fca5a5;
-            border-radius: 8px;
+            padding: 8px 14px;
+            border: 1.5px solid #fecaca;
+            border-radius: 7px;
             background: #fef2f2;
             color: #991b1b;
             font-size: 12px;
@@ -4263,7 +4655,7 @@ $active = 'ejecucion-individual';
             margin-right: auto;
             display: inline-flex;
             align-items: center;
-            gap: 5px;
+            gap: 6px;
         }
 
         .trm-btn-delete:hover {
@@ -4274,10 +4666,10 @@ $active = 'ejecucion-individual';
 
         .trm-btn-cancel {
             padding: 8px 18px;
-            border: 1.5px solid #d1d5db;
-            border-radius: 8px;
-            background: #fff;
-            color: #374151;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 7px;
+            background: #ffffff;
+            color: #334155;
             font-size: 12px;
             font-weight: 600;
             cursor: pointer;
@@ -4286,25 +4678,36 @@ $active = 'ejecucion-individual';
         }
 
         .trm-btn-cancel:hover {
-            background: #f3f4f6;
-            border-color: #9ca3af;
+            background: #f1f5f9;
+            border-color: #94a3b8;
         }
 
+        /* CTA: Keep Background Black */
         .trm-btn-apply {
             padding: 8px 20px;
-            border: none;
-            border-radius: 8px;
-            background: linear-gradient(135deg, #1e3a5f, #2563eb);
-            color: #fff;
-            font-size: 12px;
+            border: 1px solid #27272a;
+            border-radius: 7px;
+            background: #09090b;
+            color: #ffffff;
+            font-size: 12.5px;
             font-weight: 700;
             cursor: pointer;
             font-family: inherit;
-            transition: opacity .15s;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            transition: background .15s, box-shadow .15s, transform .1s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
         }
 
         .trm-btn-apply:hover {
-            opacity: .9;
+            background: #18181b;
+            border-color: #3f3f46;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+        }
+
+        .trm-btn-apply:active {
+            transform: translateY(1px);
         }
     </style>
 
@@ -4312,6 +4715,25 @@ $active = 'ejecucion-individual';
         /* ── Asistente de Traspaso ── */
         (function () {
             var _activeDetInput = null;  /* referencia al input detalle que disparó el modal */
+            var _isManualPreviewEdit = false;
+
+            document.addEventListener('DOMContentLoaded', function () {
+                var prev = document.getElementById('trm-preview');
+                if (prev) {
+                    prev.addEventListener('input', function () {
+                        _isManualPreviewEdit = true;
+                        var badge = document.getElementById('trm-manual-badge');
+                        if (badge) badge.style.display = 'inline-block';
+                    });
+                }
+            });
+
+            window.regenerarTraspasoText = function () {
+                _isManualPreviewEdit = false;
+                var badge = document.getElementById('trm-manual-badge');
+                if (badge) badge.style.display = 'none';
+                updateTraspasoPreview(true);
+            };
 
             /* Formatear fecha DD/MM/YYYY */
             function fmtFecha(val) {
@@ -4339,7 +4761,7 @@ $active = 'ejecucion-individual';
             };
 
             /* Actualizar tags y vista previa */
-            window.updateTraspasoPreview = function () {
+            window.updateTraspasoPreview = function (force) {
                 ['from', 'to'].forEach(function (side) {
                     var cls = side === 'from' ? 'trm-chk-from' : 'trm-chk-to';
                     var chks = document.querySelectorAll('.' + cls + ':checked');
@@ -4349,7 +4771,7 @@ $active = 'ejecucion-individual';
                         (function (chk) {
                             var tag = document.createElement('span');
                             tag.className = 'trm-tag';
-                            tag.innerHTML = chk.value + ' <span class="trm-tag-x" title="Quitar">✕</span>';
+                            tag.innerHTML = chk.value + ' <span class="trm-tag-x" title="Quitar">&times;</span>';
                             tag.querySelector('.trm-tag-x').onclick = function () {
                                 chk.checked = false;
                                 updateTraspasoPreview();
@@ -4358,6 +4780,8 @@ $active = 'ejecucion-individual';
                         })(chks[i]);
                     }
                 });
+
+                if (_isManualPreviewEdit && !force) return;
 
                 /* Generar texto */
                 var res = document.getElementById('trm-resolucion').value.trim().toUpperCase();
@@ -4371,7 +4795,12 @@ $active = 'ejecucion-individual';
                 if (fromCodes.length) text += ' DE LAS PARTIDAS; ' + fromCodes.join(', ');
                 if (toCodes.length) text += ' A LAS PARTIDA ' + toCodes.join(', ');
 
-                document.getElementById('trm-preview').textContent = text;
+                var pEl = document.getElementById('trm-preview'); if (pEl) { pEl.value = text; }
+            };
+
+            window.formatTraspasoMonto = function (input) {
+                var val = input.value.replace(/[^0-9.,]/g, '');
+                input.value = val;
             };
 
             window.openTraspasoModal = function (detInput) {
@@ -4383,20 +4812,21 @@ $active = 'ejecucion-individual';
             };
 
             window.abrirTraspasoDesdeMatriz = function () {
-                // Buscar un detalle-input en la página o abrir directamente
-                var inputs = document.querySelectorAll('.detalle-input');
-                var target = null;
-                for (var i = 0; i < inputs.length; i++) {
-                    var val = inputs[i].value.trim();
-                    if (!val || val.indexOf('O/P Nº') === 0 || val.indexOf('CANCELACION') === 0) {
-                        target = inputs[i];
-                        break;
-                    }
-                }
-                if (!target && inputs.length > 0) {
-                    target = inputs[0];
-                }
-                openTraspasoModal(target);
+                _activeDetInput = null; // Siempre crear un traspaso independiente
+                var delBtn = document.getElementById('trm-btn-delete');
+                if (delBtn) delBtn.style.display = 'none';
+                document.getElementById('traspaso-overlay').style.display = 'block';
+                document.getElementById('traspaso-modal').style.display = 'flex';
+                document.getElementById('trm-resolucion').value = '';
+                var mInp = document.getElementById('trm-monto');
+                if (mInp) mInp.value = '';
+                var chks = document.querySelectorAll('.trm-chk-from, .trm-chk-to');
+                for (var i = 0; i < chks.length; i++) chks[i].checked = false;
+                _isManualPreviewEdit = false;
+                var mBadge = document.getElementById('trm-manual-badge');
+                if (mBadge) mBadge.style.display = 'none';
+                updateTraspasoPreview(true);
+                document.getElementById('trm-resolucion').focus();
             };
 
             window.closeTraspasoModal = function () {
@@ -4406,41 +4836,69 @@ $active = 'ejecucion-individual';
             };
 
             window.applyTraspasoText = function () {
-                var text = document.getElementById('trm-preview').textContent;
+                var pEl = document.getElementById('trm-preview');
+                var text = (pEl ? (pEl.value !== undefined ? pEl.value : pEl.textContent) : '').trim();
                 if (!text || text === 'Completa los campos para ver el texto generado…') return;
 
-                if (_activeDetInput) {
-                    _activeDetInput.value = text;
-                    _activeDetInput.dispatchEvent(new Event('input', { bubbles: true }));
-                    closeTraspasoModal();
-                    _activeDetInput.style.transition = 'background .2s';
-                    _activeDetInput.style.background = '#d1fae5';
-                    setTimeout(function () { _activeDetInput.style.background = ''; }, 1500);
-                } else {
-                    // Guardar directamente vía AJAX y recargar
-                    var cod = document.getElementById('sel-partida') ? document.getElementById('sel-partida').value : '';
-                    var mes = document.getElementById('sel-mes-partida') ? document.getElementById('sel-mes-partida').value : '<?php echo $mes_sel; ?>';
-                    var anio = document.getElementById('sel-anio-partida') ? document.getElementById('sel-anio-partida').value : '<?php echo $anio_sel; ?>';
-                    var fecha = document.getElementById('trm-fecha').value || '';
+                var resolucion = document.getElementById('trm-resolucion') ? document.getElementById('trm-resolucion').value.trim() : '';
+                var fecha = document.getElementById('trm-fecha') ? document.getElementById('trm-fecha').value : '';
+                var monto = document.getElementById('trm-monto') ? document.getElementById('trm-monto').value.trim() : '';
+                var fromCodes = getCheckedCodes('trm-chk-from');
+                var toCodes = getCheckedCodes('trm-chk-to');
 
-                    var xhr = new XMLHttpRequest();
-                    xhr.open('POST', 'matriz.php', true);
-                    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-                    xhr.onreadystatechange = function () {
-                        if (xhr.readyState === 4) {
+                var cod = '<?php echo htmlspecialchars($cod_sel); ?>';
+                var selP = document.getElementById('sel-partida');
+                if (selP && selP.value) cod = selP.value;
+
+                var mes = '<?php echo $mes_sel; ?>';
+                var anio = '<?php echo $anio_sel; ?>';
+
+                var btnApply = document.querySelector('.trm-btn-apply');
+                if (btnApply) {
+                    btnApply.disabled = true;
+                    btnApply.innerHTML = '<span>Guardando...</span>';
+                }
+
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', 'matriz.php', true);
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                xhr.onreadystatechange = function () {
+                    if (xhr.readyState === 4) {
+                        try {
+                            var resp = JSON.parse(xhr.responseText);
+                            if (resp.ok) {
+                                closeTraspasoModal();
+                                var redirectMes = resp.mes || mes;
+                                var redirectAnio = resp.anio || anio;
+                                window.location.href = 'matriz.php?cod=' + encodeURIComponent(cod) + '&mes=' + redirectMes + '&anio=' + redirectAnio;
+                                return;
+                            } else {
+                                alert(resp.msg || 'Error al guardar el traspaso');
+                                if (btnApply) {
+                                    btnApply.disabled = false;
+                                    btnApply.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg><span>Insertar en Detalle</span>';
+                                }
+                            }
+                        } catch (e) {
+                            console.error('Error parseando respuesta:', e, xhr.responseText);
                             closeTraspasoModal();
                             window.location.reload();
                         }
-                    };
-                    xhr.send(
-                        'action=crear_traspaso_directo'
-                        + '&cod=' + encodeURIComponent(cod)
-                        + '&mes=' + encodeURIComponent(mes)
-                        + '&anio=' + encodeURIComponent(anio)
-                        + '&texto=' + encodeURIComponent(text)
-                        + '&fecha=' + encodeURIComponent(fecha)
-                    );
-                }
+                    }
+                };
+                xhr.send(
+                    'action=crear_traspaso_directo'
+                    + '&cod=' + encodeURIComponent(cod)
+                    + '&mes=' + encodeURIComponent(mes)
+                    + '&anio=' + encodeURIComponent(anio)
+                    + '&texto=' + encodeURIComponent(text)
+                    + '&fecha=' + encodeURIComponent(fecha)
+                    + '&resolucion=' + encodeURIComponent(resolucion)
+                    + '&monto=' + encodeURIComponent(monto)
+                    + '&from_codes=' + encodeURIComponent(fromCodes.join(','))
+                    + '&to_codes=' + encodeURIComponent(toCodes.join(','))
+                    + (_activeDetInput ? ('&op_id=' + encodeURIComponent(_activeDetInput.getAttribute('data-op-id') || '')) : '')
+                );
             };
 
             /* Escuchar "traspaso" en todos los inputs de detalle */
@@ -4674,8 +5132,18 @@ $active = 'ejecucion-individual';
                 if (inp && inp.value && inp.value.toUpperCase().indexOf('TRASPASO') === 0) {
                     parseTraspasoIntoModal(inp.value);
                     if (delBtnModal) delBtnModal.style.display = 'inline-flex';
+                    var opId = inp.getAttribute('data-op-id');
+                    if (opId) {
+                        var dInp = document.getElementById('dismin-' + opId);
+                        if (dInp && dInp.value) {
+                            var mInp = document.getElementById('trm-monto');
+                            if (mInp) mInp.value = dInp.value;
+                        }
+                    }
                 } else {
                     if (delBtnModal) delBtnModal.style.display = 'none';
+                    var mInp = document.getElementById('trm-monto');
+                    if (mInp && !inp) mInp.value = '';
                 }
                 _origOpen(inp);
             };
@@ -4722,7 +5190,7 @@ $active = 'ejecucion-individual';
             var _origApply = window.applyTraspasoText;
             window.applyTraspasoText = function () {
                 /* Read active input reference BEFORE origApply nulls it */
-                var preview = document.getElementById('trm-preview').textContent;
+                var pEl = document.getElementById('trm-preview'); var preview = (pEl ? (pEl.value !== undefined ? pEl.value : pEl.textContent) : '').trim();
                 /* Call original (sets value + triggers save + closes modal) */
                 _origApply();
                 /* Find recently updated detalle inputs that now contain traspaso */

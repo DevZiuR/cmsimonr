@@ -14,7 +14,7 @@
             this.config = Object.assign({
                 enabled: savedSettings.enabled !== undefined ? savedSettings.enabled : true,
                 timeoutMinutes: savedSettings.timeoutMinutes || 5, // Default 5 minutes
-                warningTimeSeconds: 10, // 10-second countdown alert
+                warningTimeSeconds: 15, // 15-second countdown alert
                 logoutUrl: '/sistema/public/logout.php?reason=inactivity', // Default logout URL
                 storageKey: 'session_last_activity'
             }, options);
@@ -132,7 +132,7 @@
                 this.showFallbackHtmlModal();
             }
 
-            // Start 10-second countdown interval
+            // Start 15-second countdown interval
             this.warningInterval = setInterval(() => {
                 this.countdownSeconds--;
                 this.updateCountdownDisplay();
@@ -160,6 +160,7 @@
                 cancelButtonColor: '#64748b',
                 confirmButtonText: 'Continuar',
                 cancelButtonText: 'Cerrar sesión',
+                focusConfirm: true,
                 allowOutsideClick: false,
                 allowEscapeKey: false,
                 allowEnterKey: true
@@ -229,7 +230,7 @@
                         cursor: pointer;
                         box-shadow: 0 2px 4px rgba(37,99,235,0.2);
                         transition: background-color 0.2s;
-                    ">Continue</button>
+                    ">Continuar</button>
                     <button id="autologout-btn-logout" style="
                         background-color: #e2e8f0;
                         color: #334155;

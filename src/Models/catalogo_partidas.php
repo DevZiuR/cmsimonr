@@ -273,6 +273,12 @@ function get_matching_code_variants($cod) {
             $variants[] = $dash_tail;
         } elseif (count(explode('-', $raw)) >= 2) {
             $variants[] = $prefix . $raw;
+            $p = explode('-', $raw);
+            if (count($p) >= 1 && strlen($p[0]) === 3) {
+                $ramo = substr($p[0], 0, 1) . '.' . substr($p[0], 1);
+                $rest = array_slice($p, 1);
+                $variants[] = $ramo . (count($rest) > 0 ? '.' . implode('.', $rest) : '');
+            }
         }
     }
 

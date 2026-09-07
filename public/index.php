@@ -1315,48 +1315,35 @@ if (isset($_GET['ajax'])) {
         }
 
         .welcome-banner {
-            background-image: url('/sistema/assets/img/panel-bg.png');
+            background-image: url('/sistema/assets/img/banner.png');
             background-size: cover;
             background-position: center;
             color: #fff;
-            padding: 40px 28px;
-            border-radius: 16px;
-            margin-bottom: 28px;
+            padding: 30px 28px;
+            border-radius: 14px;
+            margin-bottom: 24px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            box-shadow: 0 14px 32px -12px rgba(30, 64, 175, 0.45);
+            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
             position: relative;
             overflow: hidden;
-        }
-
-        /* Soft floating glow orbs — behind content */
-        .welcome-banner::before,
-        .welcome-banner::after {
-            content: '';
-            position: absolute;
-            border-radius: 50%;
-            pointer-events: none;
-            filter: blur(52px);
-            opacity: 0.22;
+            min-height: 80px;
         }
 
         .welcome-banner::before {
-            width: 280px;
-            height: 280px;
-            background: #a5b4fc;
-            top: -60px;
-            right: 60px;
-            animation: wb-float-a 9s ease-in-out infinite;
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(15, 50, 150, 0.82) 0%, rgba(10, 30, 100, 0.55) 100%);
+            border-radius: inherit;
+            pointer-events: none;
+            z-index: 0;
         }
 
-        .welcome-banner::after {
-            width: 200px;
-            height: 200px;
-            background: #67e8f9;
-            bottom: -50px;
-            left: 30px;
-            animation: wb-float-b 12s ease-in-out infinite;
+        .welcome-banner>* {
+            position: relative;
+            z-index: 1;
         }
 
         .welcome-greet {

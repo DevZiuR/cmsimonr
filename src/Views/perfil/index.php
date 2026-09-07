@@ -382,12 +382,12 @@ $rol_valor = isset($_SESSION['rol']) ? $_SESSION['rol'] : 'visualizador';
 
                     <div class="form-group">
                         <label for="password_nueva">Nueva Contraseña (dejar en blanco para mantener la actual):</label>
-                        <input type="password" name="password_nueva" id="password_nueva" class="form-control" placeholder="***">
+                        <input type="password" name="password_nueva" id="password_nueva" class="form-control" autocomplete="new-password" placeholder="Ingresa una nueva contraseña...">
                     </div>
 
                     <div class="form-group">
                         <label for="password_confirmar">Confirmar Nueva Contraseña:</label>
-                        <input type="password" name="password_confirmar" id="password_confirmar" class="form-control" placeholder="***">
+                        <input type="password" name="password_confirmar" id="password_confirmar" class="form-control" autocomplete="new-password" placeholder="Repite la nueva contraseña...">
                     </div>
 
                     <hr style="margin: 18px 0; border: none; border-top: 1px solid #cbd5e1;">
@@ -409,7 +409,7 @@ $rol_valor = isset($_SESSION['rol']) ? $_SESSION['rol'] : 'visualizador';
                         <input type="number" id="autologout_minutes" class="form-control" min="1" max="120" value="5"
                             placeholder="Ej. 5">
                         <small style="color: #64748b; display: block; margin-top: 4px;">El sistema mostrará un aviso
-                            emergente con cuenta regresiva de 10 segundos antes del cierre de sesión.</small>
+                            emergente con cuenta regresiva de 15 segundos antes del cierre de sesión.</small>
                     </div>
 
                     <div style="margin-top: 18px; text-align: right;">
