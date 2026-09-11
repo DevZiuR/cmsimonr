@@ -218,6 +218,8 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
         background: #000000 !important;
         color: #e2e8f0 !important;
         height: 100vh !important;
+        position: relative !important;
+        position: -webkit-sticky !important;
         position: sticky !important;
         top: 0 !important;
         display: flex !important;
@@ -238,7 +240,7 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
         justify-content: space-between !important;
         padding: 12px 16px !important;
         border-bottom: 1px solid #18181b !important;
-        background: #000000ff !important;
+        background: #000000 !important;
         gap: 8px !important;
         min-height: 58px !important;
         box-sizing: border-box !important;
@@ -515,6 +517,34 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
     .sidebar .sb-parent-label:hover .sb-icon,
     .sidebar .sb-group.open>.sb-parent-label .sb-icon {
         color: #ffffff !important;
+    }
+
+    /* ── Flex-gap fallback (browsers sin gap en flex): márgenes por defecto,
+       se anulan donde gap sí funciona. Sin cambio visual en navegadores modernos. ── */
+    .sidebar .sb-top-header>*+*,
+    .sidebar .sb-brand-wrap>*+*,
+    .sidebar .sb-user-card>*+* {
+        margin-left: 8px !important;
+    }
+
+    .sidebar .sb-user-card>*+* {
+        margin-left: 10px !important;
+    }
+
+    .sidebar .sb-user-info>*+* {
+        margin-top: 3px !important;
+    }
+
+    @supports (gap: 8px) {
+        .sidebar .sb-top-header>*+*,
+        .sidebar .sb-brand-wrap>*+*,
+        .sidebar .sb-user-card>*+* {
+            margin-left: 0 !important;
+        }
+
+        .sidebar .sb-user-info>*+* {
+            margin-top: 0 !important;
+        }
     }
 
     /* ── User Card inferior ── */
@@ -1017,6 +1047,20 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
 <!-- ═══ GLOBAL PREMIUM ANIMATIONS (injected by sidebar) ══════════════════════ -->
 <style id="gbl-anim">
     /* ─── Keyframes ──────────────────────────────────────────────────────── */
+    @-webkit-keyframes gbl-row-in {
+        from {
+            opacity: 0;
+            -webkit-transform: translateY(10px);
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            -webkit-transform: translateY(0);
+            transform: translateY(0);
+        }
+    }
+
     @keyframes gbl-row-in {
         from {
             opacity: 0;
@@ -1025,6 +1069,20 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
 
         to {
             opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @-webkit-keyframes gbl-card-in {
+        from {
+            opacity: 0;
+            -webkit-transform: translateY(14px);
+            transform: translateY(14px);
+        }
+
+        to {
+            opacity: 1;
+            -webkit-transform: translateY(0);
             transform: translateY(0);
         }
     }
@@ -1038,6 +1096,23 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
         to {
             opacity: 1;
             transform: translateY(0);
+        }
+    }
+
+    @-webkit-keyframes gbl-btn-press {
+        0% {
+            -webkit-transform: scale(1);
+            transform: scale(1);
+        }
+
+        45% {
+            -webkit-transform: scale(0.96);
+            transform: scale(0.96);
+        }
+
+        100% {
+            -webkit-transform: scale(1);
+            transform: scale(1);
         }
     }
 
@@ -1061,6 +1136,7 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
     }
 
     tbody tr.gbl-row-visible {
+        -webkit-animation: gbl-row-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
         animation: gbl-row-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
     }
 
@@ -1072,6 +1148,7 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
 
     .panel.gbl-card-visible,
     .stat-card.gbl-card-visible {
+        -webkit-animation: gbl-card-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
         animation: gbl-card-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
     }
 
@@ -1094,6 +1171,7 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
     .btn-seed:active,
     .btn-print:active,
     .quick-btn:active {
+        -webkit-animation: gbl-btn-press 0.18s ease both !important;
         animation: gbl-btn-press 0.18s ease both !important;
     }
 
@@ -1104,6 +1182,30 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
 
     tbody tr:hover {
         box-shadow: inset 3px 0 0 #6366f1 !important;
+    }
+
+    /* ─── Movimiento reducido: contenido siempre visible, sin animación ─── */
+    @media (prefers-reduced-motion: reduce) {
+        tbody tr.gbl-row-ready,
+        .panel.gbl-card-ready,
+        .stat-card.gbl-card-ready {
+            opacity: 1 !important;
+        }
+
+        tbody tr.gbl-row-visible,
+        .panel.gbl-card-visible,
+        .stat-card.gbl-card-visible,
+        button:active,
+        a.btn-primary:active,
+        a.btn-secondary:active,
+        .btn-primary:active,
+        .btn-secondary:active,
+        .btn-seed:active,
+        .btn-print:active,
+        .quick-btn:active {
+            -webkit-animation: none !important;
+            animation: none !important;
+        }
     }
 </style>
 

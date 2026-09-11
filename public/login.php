@@ -83,11 +83,27 @@ $usuario = '';
         }
 
         body {
-            font-family: 'Geist', sans-serif;
+            font-family: 'Geist', 'Segoe UI', Tahoma, Arial, sans-serif;
+            background: #F4F6FA;
             background: var(--off-white);
             display: flex;
             min-height: 100vh;
+            color: #0F1C2E;
             color: var(--text-primary);
+        }
+
+        @-webkit-keyframes pageFadeIn {
+            from {
+                opacity: 0;
+                -webkit-transform: translateY(4px);
+                transform: translateY(4px);
+            }
+
+            to {
+                opacity: 1;
+                -webkit-transform: translateY(0);
+                transform: translateY(0);
+            }
         }
 
         @keyframes pageFadeIn {
@@ -107,6 +123,7 @@ $usuario = '';
             display: flex;
             width: 100%;
             min-height: 100vh;
+            -webkit-animation: pageFadeIn 1.1s cubic-bezier(0.25, 1, 0.5, 1) forwards;
             animation: pageFadeIn 1.1s cubic-bezier(0.25, 1, 0.5, 1) forwards;
         }
 
@@ -132,7 +149,10 @@ $usuario = '';
         .panel-left::before {
             content: '';
             position: absolute;
-            inset: 0;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
             background: linear-gradient(160deg,
                     rgba(6, 14, 45, 0.68) 0%,
                     rgba(8, 20, 70, 0.40) 45%,
@@ -145,6 +165,7 @@ $usuario = '';
         .left-header {
             position: relative;
             z-index: 2;
+            padding: 32px 40px;
             padding: clamp(24px, 3.5vh, 40px) clamp(28px, 3.5vw, 48px);
             display: flex;
             align-items: center;
@@ -179,15 +200,18 @@ $usuario = '';
             position: relative;
             z-index: 2;
             margin-top: auto;
+            padding: 40px;
             padding: clamp(28px, 4vh, 52px) clamp(28px, 3.5vw, 52px);
         }
 
         .left-body h2 {
             color: #FFFFFF;
+            font-size: 2.2rem;
             font-size: clamp(1.7rem, 2.8vw, 2.6rem);
             font-weight: 800;
             line-height: 1.18;
             letter-spacing: -.025em;
+            margin-bottom: 16px;
             margin-bottom: clamp(12px, 1.8vh, 20px);
         }
 
@@ -198,6 +222,7 @@ $usuario = '';
 
         .left-body p {
             color: rgba(255, 255, 255, .65);
+            font-size: .9rem;
             font-size: clamp(.82rem, 1vw, .95rem);
             font-weight: 400;
             line-height: 1.7;
@@ -207,6 +232,7 @@ $usuario = '';
         .left-copy {
             position: relative;
             z-index: 2;
+            padding: 16px 40px;
             padding: clamp(12px, 1.5vh, 20px) clamp(28px, 3.5vw, 52px);
             color: rgba(255, 255, 255, .28);
             font-size: .65rem;
@@ -262,6 +288,7 @@ $usuario = '';
             background: rgba(220, 38, 38, .12);
             border: 1px solid rgba(220, 38, 38, .30);
             border-left: 4px solid #dc2626;
+            border-radius: 10px;
             border-radius: var(--radius-sm);
             padding: 12px 16px;
             font-size: .83rem;
@@ -298,6 +325,7 @@ $usuario = '';
             left: 14px;
             color: #52525b;
             pointer-events: none;
+            transition: color .22s;
             transition: color var(--transition);
             display: flex;
             align-items: center;
@@ -307,12 +335,14 @@ $usuario = '';
             width: 100%;
             padding: 13px 44px 13px 44px;
             border: 1.5px solid #27272a;
+            border-radius: 10px;
             border-radius: var(--radius-sm);
-            font-family: 'Inter', sans-serif;
+            font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
             font-size: .88rem;
             color: #f4f4f5;
             background: #18181b;
             outline: none;
+            transition: border-color .22s, box-shadow .22s, background .22s;
             transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
         }
 
@@ -347,6 +377,7 @@ $usuario = '';
             display: flex;
             align-items: center;
             border-radius: 6px;
+            transition: color .22s, background .22s;
             transition: color var(--transition), background var(--transition);
         }
 
@@ -365,6 +396,7 @@ $usuario = '';
             color: #818cf8;
             text-decoration: none;
             font-weight: 500;
+            transition: opacity .22s;
             transition: opacity var(--transition);
         }
 
@@ -379,13 +411,15 @@ $usuario = '';
             background: #6366f1;
             color: #ffffff;
             border: none;
+            border-radius: 10px;
             border-radius: var(--radius-sm);
-            font-family: 'Inter', sans-serif;
+            font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
             font-size: .9rem;
             font-weight: 600;
             cursor: pointer;
             letter-spacing: .02em;
             overflow: hidden;
+            transition: transform .22s, box-shadow .22s, background .22s;
             transition: transform var(--transition), box-shadow var(--transition), background var(--transition);
             margin-top: 8px;
         }
@@ -410,6 +444,7 @@ $usuario = '';
 
         .btn-arrow {
             display: inline-flex;
+            transition: transform .22s;
             transition: transform var(--transition);
         }
 
@@ -426,6 +461,28 @@ $usuario = '';
             gap: 6px;
             font-size: .72rem;
             color: #3f3f46;
+        }
+
+        /* ─── Flex-gap fallback (navegadores sin gap en flex) ─── */
+        .left-header>*+* {
+            margin-left: 10px;
+        }
+
+        .btn-inner>*+* {
+            margin-left: 8px;
+        }
+
+        .login-footer>*+* {
+            margin-left: 6px;
+        }
+
+        @supports (gap: 10px) {
+
+            .left-header>*+*,
+            .btn-inner>*+*,
+            .login-footer>*+* {
+                margin-left: 0;
+            }
         }
 
         /* ─── RESPONSIVE ──────────────────────────────────────────────── */
@@ -451,6 +508,13 @@ $usuario = '';
             }
         }
 
+        @-webkit-keyframes spin {
+            to {
+                -webkit-transform: rotate(360deg);
+                transform: rotate(360deg);
+            }
+        }
+
         @keyframes spin {
             to {
                 transform: rotate(360deg);
@@ -458,6 +522,20 @@ $usuario = '';
         }
 
         /* ─── Login premium entrance animations ───────────────────────────── */
+        @-webkit-keyframes lg-card-in {
+            from {
+                opacity: 0;
+                -webkit-transform: translateY(24px) scale(0.98);
+                transform: translateY(24px) scale(0.98);
+            }
+
+            to {
+                opacity: 1;
+                -webkit-transform: translateY(0) scale(1);
+                transform: translateY(0) scale(1);
+            }
+        }
+
         @keyframes lg-card-in {
             from {
                 opacity: 0;
@@ -467,6 +545,20 @@ $usuario = '';
             to {
                 opacity: 1;
                 transform: translateY(0) scale(1);
+            }
+        }
+
+        @-webkit-keyframes lg-text-in {
+            from {
+                opacity: 0;
+                -webkit-transform: translateY(10px);
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                -webkit-transform: translateY(0);
+                transform: translateY(0);
             }
         }
 
@@ -482,6 +574,20 @@ $usuario = '';
             }
         }
 
+        @-webkit-keyframes lg-orb-a {
+
+            0%,
+            100% {
+                -webkit-transform: translate(0, 0) scale(1);
+                transform: translate(0, 0) scale(1);
+            }
+
+            50% {
+                -webkit-transform: translate(24px, -20px) scale(1.1);
+                transform: translate(24px, -20px) scale(1.1);
+            }
+        }
+
         @keyframes lg-orb-a {
 
             0%,
@@ -491,6 +597,20 @@ $usuario = '';
 
             50% {
                 transform: translate(24px, -20px) scale(1.1);
+            }
+        }
+
+        @-webkit-keyframes lg-orb-b {
+
+            0%,
+            100% {
+                -webkit-transform: translate(0, 0) scale(1);
+                transform: translate(0, 0) scale(1);
+            }
+
+            50% {
+                -webkit-transform: translate(-18px, 16px) scale(1.07);
+                transform: translate(-18px, 16px) scale(1.07);
             }
         }
 
@@ -518,15 +638,18 @@ $usuario = '';
 
         /* Card entrance */
         .login-card {
+            -webkit-animation: lg-card-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
             animation: lg-card-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
         }
 
         /* Stagger for header h2 and sub */
         .card-header h2 {
+            -webkit-animation: lg-text-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.28s both;
             animation: lg-text-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.28s both;
         }
 
         .card-header .card-sub {
+            -webkit-animation: lg-text-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.4s both;
             animation: lg-text-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.4s both;
         }
 
@@ -552,6 +675,7 @@ $usuario = '';
             background: #818cf8;
             top: -80px;
             right: -40px;
+            -webkit-animation: lg-orb-a 11s ease-in-out infinite;
             animation: lg-orb-a 11s ease-in-out infinite;
         }
 
@@ -561,11 +685,13 @@ $usuario = '';
             background: #67e8f9;
             bottom: -60px;
             left: -20px;
+            -webkit-animation: lg-orb-b 14s ease-in-out infinite;
             animation: lg-orb-b 14s ease-in-out infinite;
         }
 
         /* Left panel text stagger */
         .left-body p {
+            -webkit-animation: lg-text-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.55s both;
             animation: lg-text-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.55s both;
         }
 
@@ -588,7 +714,28 @@ $usuario = '';
         }
 
         .btn-login:hover::after {
+            -webkit-animation: lg-shimmer 0.55s ease forwards;
             animation: lg-shimmer 0.55s ease forwards;
+        }
+
+        /* ─── Movimiento reducido: efectos estáticos, sin animación ─── */
+        @media (prefers-reduced-motion: reduce) {
+            .login-wrapper,
+            .login-card,
+            .card-header h2,
+            .card-header .card-sub,
+            .left-body p,
+            .panel-right::before,
+            .panel-right::after,
+            .btn-login:hover::after {
+                -webkit-animation: none !important;
+                animation: none !important;
+            }
+
+            .panel-right::before,
+            .panel-right::after {
+                display: none !important;
+            }
         }
     </style>
 </head>

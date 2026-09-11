@@ -640,6 +640,65 @@ if ($edit_id > 0) {
             text-align: right;
         }
 
+        /* ── Editable total inputs ── */
+        .tot-field-wrap {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .tot-input {
+            border: none;
+            border-bottom: 1px dashed #aaa;
+            background: transparent;
+            font-size: 11px;
+            font-weight: bold;
+            text-align: right;
+            width: 100px;
+            padding: 0 2px;
+            outline: none;
+            color: inherit;
+            cursor: text;
+        }
+
+        .tot-input:focus {
+            border-bottom: 1.5px solid #1565c0;
+            background: #e3f2fd;
+            border-radius: 2px;
+        }
+
+        .tot-input.manual {
+            border-bottom: 1.5px solid #e65100;
+            background: #fff3e0;
+            border-radius: 2px;
+        }
+
+        .tot-input-total {
+            font-size: 12px;
+            font-weight: 800;
+            width: 110px;
+        }
+
+        .tot-unlock {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 13px;
+            padding: 0;
+            line-height: 1;
+            opacity: 0.7;
+        }
+
+        .tot-unlock:hover { opacity: 1; }
+
+        @media print {
+            .tot-unlock { display: none !important; }
+            .tot-input {
+                border: none !important;
+                background: transparent !important;
+            }
+        }
+
         .oc-tot-row.total-gen {
             border-top: 1.5px solid #000;
             font-weight: 800;
@@ -1101,23 +1160,38 @@ if ($edit_id > 0) {
                             <div class="oc-totales-cell">
                                 <div class="oc-tot-row">
                                     <label>Base Imponible:</label>
-                                    <span id="t-base">0,00</span>
+                                    <span class="tot-field-wrap">
+                                        <input type="text" id="t-base" class="tot-input" value="0,00" autocomplete="off">
+                                        <button type="button" class="tot-unlock" id="unlock-base" title="Restablecer al valor calculado" style="display:none" onclick="resetTot('base')">&#128274;</button>
+                                    </span>
                                 </div>
                                 <div class="oc-tot-row">
                                     <label>SAT 0,1%:</label>
-                                    <span id="t-sat">0,00</span>
+                                    <span class="tot-field-wrap">
+                                        <input type="text" id="t-sat" class="tot-input" value="0,00" autocomplete="off">
+                                        <button type="button" class="tot-unlock" id="unlock-sat" title="Restablecer al valor calculado" style="display:none" onclick="resetTot('sat')">&#128274;</button>
+                                    </span>
                                 </div>
                                 <div class="oc-tot-row">
                                     <label>Sub-Total:</label>
-                                    <span id="t-sub">0,00</span>
+                                    <span class="tot-field-wrap">
+                                        <input type="text" id="t-sub" class="tot-input" value="0,00" autocomplete="off">
+                                        <button type="button" class="tot-unlock" id="unlock-sub" title="Restablecer al valor calculado" style="display:none" onclick="resetTot('sub')">&#128274;</button>
+                                    </span>
                                 </div>
                                 <div class="oc-tot-row">
                                     <label id="lbl-iva">IVA 16%:</label>
-                                    <span id="t-iva">0,00</span>
+                                    <span class="tot-field-wrap">
+                                        <input type="text" id="t-iva" class="tot-input" value="0,00" autocomplete="off">
+                                        <button type="button" class="tot-unlock" id="unlock-iva" title="Restablecer al valor calculado" style="display:none" onclick="resetTot('iva')">&#128274;</button>
+                                    </span>
                                 </div>
                                 <div class="oc-tot-row total-gen">
                                     <label>Total General:</label>
-                                    <span id="t-total">0,00</span>
+                                    <span class="tot-field-wrap">
+                                        <input type="text" id="t-total" class="tot-input tot-input-total" value="0,00" autocomplete="off">
+                                        <button type="button" class="tot-unlock" id="unlock-total" title="Restablecer al valor calculado" style="display:none" onclick="resetTot('total')">&#128274;</button>
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -1506,24 +1580,74 @@ if ($edit_id > 0) {
             var iva = baseGravada * 0.16;  /* IVA 16% solo sobre renglones no exentos */
             var total = base + iva;   /* Total General = Base + IVA */
 
-            document.getElementById('t-base').textContent = fmt(base);
-            document.getElementById('t-sat').textContent = fmt(sat);
-            document.getElementById('t-sub').textContent = fmt(sub);
-            document.getElementById('t-iva').textContent = fmt(iva);
-            document.getElementById('t-total').textContent = fmt(total);
+            /* Only overwrite each total if the user hasn't manually edited it */
+            var calcValues = { base: base, sat: sat, sub: sub, iva: iva, total: total };
+            ['base','sat','sub','iva','total'].forEach(function(k){
+                var el = document.getElementById('t-' + k);
+                if (!el.dataset.manual) {
+                    el.value = fmt(calcValues[k]);
+                }
+            });
 
-            var letras = total > 0 ? montoLetras(total) : '\u2014';
+            /* Use the displayed values (possibly overridden) to set hidden fields */
+            var dispBase  = parseTot('base');
+            var dispSat   = parseTot('sat');
+            var dispIva   = parseTot('iva');
+            var dispTotal = parseTot('total');
+
+            var letras = dispTotal > 0 ? montoLetras(dispTotal) : '\u2014';
             document.getElementById('monto-letras-txt').textContent = letras;
 
-            document.getElementById('h-base').value = base.toFixed(2);
-            document.getElementById('h-sat').value = sat.toFixed(2);
-            document.getElementById('h-iva').value = iva.toFixed(2);
-            document.getElementById('h-total').value = total.toFixed(2);
+            document.getElementById('h-base').value = dispBase.toFixed(2);
+            document.getElementById('h-sat').value = dispSat.toFixed(2);
+            document.getElementById('h-iva').value = dispIva.toFixed(2);
+            document.getElementById('h-total').value = dispTotal.toFixed(2);
             document.getElementById('h-letras').value = letras;
 
             checkEmptyRows();
             actualizarPartidas();
         }
+
+        function parseTot(k) {
+            var el = document.getElementById('t-' + k);
+            var raw = (el ? el.value : '0').replace(/,/g, '');
+            return parseFloat(raw) || 0;
+        }
+
+        function resetTot(k) {
+            var el = document.getElementById('t-' + k);
+            if (el) {
+                delete el.dataset.manual;
+                el.classList.remove('manual');
+            }
+            var btn = document.getElementById('unlock-' + k);
+            if (btn) btn.style.display = 'none';
+            recalc();
+        }
+
+        /* Mark a total field as manually overridden on user input */
+        ['base','sat','sub','iva','total'].forEach(function(k) {
+            var el = document.getElementById('t-' + k);
+            if (!el) return;
+            el.addEventListener('input', function() {
+                el.dataset.manual = '1';
+                el.classList.add('manual');
+                var btn = document.getElementById('unlock-' + k);
+                if (btn) btn.style.display = 'inline';
+                /* Sync hidden field immediately */
+                var raw = el.value.replace(/,/g, '');
+                var val = parseFloat(raw) || 0;
+                var hidMap = { base: 'h-base', sat: 'h-sat', sub: 'h-sub', iva: 'h-iva', total: 'h-total' };
+                var hid = document.getElementById(hidMap[k]);
+                if (hid) hid.value = val.toFixed(2);
+                /* If total changes, update monto-letras */
+                if (k === 'total') {
+                    var letras = val > 0 ? montoLetras(val) : '\u2014';
+                    document.getElementById('monto-letras-txt').textContent = letras;
+                    document.getElementById('h-letras').value = letras;
+                }
+            });
+        });
 
         function actualizarPartidas() {
             var grupos = {};
@@ -1557,8 +1681,8 @@ if ($edit_id > 0) {
                 if (Object.prototype.hasOwnProperty.call(grupos, k)) {
                     var tr2 = document.createElement('tr');
                     tr2.innerHTML =
-                        '<td><input type="text" name="partida[]" value="' + k + '" readonly style="text-align:center;"></td>' +
-                        '<td style="text-align:right;"><input type="text" name="monto_partida[]" value="' + fmt(grupos[k]) + '" readonly style="text-align:right;"></td>';
+                        '<td><input type="text" name="partida[]" value="' + k + '" style="text-align:center;"></td>' +
+                        '<td style="text-align:right;"><input type="text" name="monto_partida[]" value="' + fmt(grupos[k]) + '" style="text-align:right;"></td>';
                     tbody.appendChild(tr2);
                 }
             }
@@ -1567,16 +1691,16 @@ if ($edit_id > 0) {
             var ivaVal = parseFloat(document.getElementById('h-iva').value) || 0;
             var trIva = document.createElement('tr');
             trIva.innerHTML =
-                '<td><input type="text" name="partida[]" value="4.03.18.01.00" readonly style="text-align:center; background:#fff8e1;"></td>' +
-                '<td style="text-align:right;"><input type="text" name="monto_partida[]" value="' + fmt(ivaVal) + '" readonly style="text-align:right; background:#fff8e1;"></td>';
+                '<td><input type="text" name="partida[]" value="4.03.18.01.00" style="text-align:center; background:#fff8e1;"></td>' +
+                '<td style="text-align:right;"><input type="text" name="monto_partida[]" value="' + fmt(ivaVal) + '" style="text-align:right; background:#fff8e1;"></td>';
             tbody.appendChild(trIva);
 
             /* ── Partida SAT 0,1%: 4.03.18.99.00 ── */
             var satVal = parseFloat(document.getElementById('h-sat').value) || 0;
             var trSat = document.createElement('tr');
             trSat.innerHTML =
-                '<td><input type="text" name="partida[]" value="4.03.18.99.00" readonly style="text-align:center; background:#e8f5e9;"></td>' +
-                '<td style="text-align:right;"><input type="text" name="monto_partida[]" value="' + fmt(satVal) + '" readonly style="text-align:right; background:#e8f5e9;"></td>';
+                '<td><input type="text" name="partida[]" value="4.03.18.99.00" style="text-align:center; background:#e8f5e9;"></td>' +
+                '<td style="text-align:right;"><input type="text" name="monto_partida[]" value="' + fmt(satVal) + '" style="text-align:right; background:#e8f5e9;"></td>';
             tbody.appendChild(trSat);
         }
 

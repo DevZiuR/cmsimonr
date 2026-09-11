@@ -1781,6 +1781,11 @@ function addRetRow(desc, codigo, tasa, monto) {
             ' style="background:none;border:none;cursor:pointer;color:#c00;font-weight:bold;">X</button>' +
         '</td>';
     document.getElementById('ret-body').appendChild(tr);
+    /* Montos cargados desde BD (modo edición): conservarlos, no recalcularlos */
+    if (monto !== undefined) {
+        var elComSaved = tr.querySelector('.ret-comision');
+        if (elComSaved) { elComSaved.dataset.userEdited = 'true'; }
+    }
     recalcRetenciones();
 }
 
@@ -1846,6 +1851,98 @@ function delContRow(i) {
 }
 
 /* ============================================================
+   REPARAR CONTABILIDAD LEGACY (cont_json sin totales)
+   Las OP guardadas antes del fix no tienen "total" en cont_json,
+   así que las filas cargan en 0.00 y el recalc pone todo en cero.
+   Si detecta ese caso y la OP tiene O/C u O/S vinculada, trae
+   las partidas de la orden origen y rellena los montos por código.
+   Al próximo Guardar, prepararEnvio() ya persistirá los totales.
+   ============================================================ */
+function repararContLegacy() {
+    var filas = document.querySelectorAll('#cont-body tr');
+    if (!filas.length) return;
+
+    var suma = 0;
+    for (var i = 0; i < filas.length; i++) {
+        var el = filas[i].querySelector('input[name="cont_total[]"]');
+        suma += parseMonto(el ? el.value : 0);
+    }
+    if (suma > 0) return; /* ya tiene montos, nada que reparar */
+
+    var hOc = document.getElementById('h-oc-id');
+    var hOs = document.getElementById('h-os-id');
+    var ocId = hOc ? parseInt(hOc.value, 10) || 0 : 0;
+    var osId = hOs ? parseInt(hOs.value, 10) || 0 : 0;
+    var tipo = '', oid = 0;
+    if (ocId > 0)      { tipo = 'oc'; oid = ocId; }
+    else if (osId > 0) { tipo = 'os'; oid = osId; }
+    else return;
+
+    fetch('../../controllers/ordenes_compra/buscar_op.php?tipo=' + tipo + '&id=' + oid)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data || !data.partidas || !data.partidas.length) return;
+
+            /* Mapa partida origen → monto. Clave: obra|partid|gen|espec
+               (misma derivación que addContRowFromData: '4.02.10.02.00'
+                → obra '402', partid '10', gen '02', espec '00') */
+            var mapa = {};
+            var orden = [];
+            for (var k = 0; k < data.partidas.length; k++) {
+                var p = data.partidas[k];
+                var segs = (p.partida || '').split('.');
+                while (segs.length < 5) { segs.push(''); }
+                var key = ((segs[0] || '') + (segs[1] || '')) + '|' +
+                          (segs[2] || '') + '|' + (segs[3] || '') + '|' + (segs[4] || '');
+                var pm = parseFloat(p.monto) || 0;
+                if (pm <= 0) continue;
+                if (mapa[key] === undefined) { mapa[key] = 0; orden.push(key); }
+                mapa[key] += pm;
+            }
+
+            var hits = 0;
+            var sinMatch = [];
+            for (var j = 0; j < filas.length; j++) {
+                var tr = filas[j];
+                var g = function(n) {
+                    var e = tr.querySelector('input[name="' + n + '"]');
+                    return e ? e.value.trim() : '';
+                };
+                var rk = g('cont_obra[]') + '|' + g('cont_partid[]') + '|' + g('cont_gen[]') + '|' + g('cont_espec[]');
+                if (mapa[rk] !== undefined && mapa[rk] > 0) {
+                    var inp = tr.querySelector('input[name="cont_total[]"]');
+                    if (inp) { inp.value = fmt(mapa[rk]); }
+                    mapa[rk] = 0; /* no reutilizar el mismo monto dos veces */
+                    hits++;
+                } else {
+                    sinMatch.push(tr);
+                }
+            }
+
+            /* Fallback: si nada coincidió por código pero hay igual
+               cantidad de partidas con monto, rellenar en orden */
+            if (hits === 0 && orden.length === filas.length) {
+                for (var f = 0; f < filas.length; f++) {
+                    var inpF = filas[f].querySelector('input[name="cont_total[]"]');
+                    if (inpF) { inpF.value = fmt(mapa[orden[f]]); }
+                }
+            } else if (sinMatch.length && orden.length) {
+                /* Repartir montos sobrantes (p. ej. IVA/SAT) en filas vacías */
+                var sobr = [];
+                for (var s = 0; s < orden.length; s++) {
+                    if (mapa[orden[s]] > 0) sobr.push(mapa[orden[s]]);
+                }
+                for (var u = 0; u < sinMatch.length && u < sobr.length; u++) {
+                    var inpU = sinMatch[u].querySelector('input[name="cont_total[]"]');
+                    if (inpU && parseMonto(inpU.value) === 0) { inpU.value = fmt(sobr[u]); }
+                }
+            }
+
+            recalcContabilidad();
+        });
+}
+
+/* ============================================================
    PREPARAR ENVÍO
    ============================================================ */
 function prepararEnvio() {
@@ -1868,7 +1965,8 @@ function prepararEnvio() {
             partid:  get('cont_partid[]'),
             gen:     get('cont_gen[]'),
             espec:   get('cont_espec[]'),
-            sub:     get('cont_sub[]')
+            sub:     get('cont_sub[]'),
+            total:   get('cont_total[]')
         });
     }
     document.getElementById('h-cont').value = JSON.stringify(rows);
@@ -2017,7 +2115,11 @@ document.addEventListener('DOMContentLoaded', function() {
         var contEditData = <?php echo json_encode($contabilidad_edit); ?>;
         if (Array.isArray(contEditData) && contEditData.length > 0) {
             contEditData.forEach(function(c) {
-                var m = c.total !== undefined ? parseMonto(c.total) : 0;
+                var rawTot = (c.total !== undefined) ? c.total
+                           : (c.monto !== undefined ? c.monto
+                           : (c.total_bs !== undefined ? c.total_bs
+                           : (c.monto_total !== undefined ? c.monto_total : 0)));
+                var m = parseMonto(rawTot);
                 addContRowFromFull(
                     c.anio || '2026',
                     c.sector || '01',
@@ -2037,6 +2139,7 @@ document.addEventListener('DOMContentLoaded', function() {
             addContRow();
         }
         recalcContabilidad();
+        repararContLegacy();
     <?php else: ?>
         addRetRow();
         addContRow();

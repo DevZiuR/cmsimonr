@@ -1121,6 +1121,29 @@ if (isset($_GET['ajax'])) {
             margin-bottom: 40px;
         }
 
+        /* Browsers without CSS grid: flex fallback, same visuals */
+        @supports not (display: grid) {
+            .stats-grid {
+                display: flex;
+                flex-wrap: wrap;
+                margin-left: -12px;
+                margin-right: -12px;
+            }
+
+            .stats-grid .stat-card {
+                flex: 1 1 190px;
+                margin: 0 12px 24px 12px;
+            }
+
+            .two-col {
+                display: block;
+            }
+
+            .two-col .panel {
+                margin-bottom: 24px;
+            }
+        }
+
         .stat-card {
             background: #ffffff;
             border: none;
@@ -1276,6 +1299,43 @@ if (isset($_GET['ajax'])) {
             }
         }
 
+        @-webkit-keyframes wb-wave {
+            0% {
+                -webkit-transform: rotate(0deg);
+                transform: rotate(0deg);
+            }
+
+            15% {
+                -webkit-transform: rotate(18deg);
+                transform: rotate(18deg);
+            }
+
+            30% {
+                -webkit-transform: rotate(-8deg);
+                transform: rotate(-8deg);
+            }
+
+            45% {
+                -webkit-transform: rotate(16deg);
+                transform: rotate(16deg);
+            }
+
+            60% {
+                -webkit-transform: rotate(-4deg);
+                transform: rotate(-4deg);
+            }
+
+            75% {
+                -webkit-transform: rotate(10deg);
+                transform: rotate(10deg);
+            }
+
+            100% {
+                -webkit-transform: rotate(0deg);
+                transform: rotate(0deg);
+            }
+        }
+
         @keyframes wb-wave {
             0% {
                 transform: rotate(0deg);
@@ -1336,7 +1396,10 @@ if (isset($_GET['ajax'])) {
         .welcome-banner::before {
             content: '';
             position: absolute;
-            inset: 0;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
             background: linear-gradient(135deg, rgba(15, 50, 150, 0.82) 0%, rgba(10, 30, 100, 0.55) 100%);
             border-radius: inherit;
             pointer-events: none;
@@ -1361,7 +1424,12 @@ if (isset($_GET['ajax'])) {
             font-size: 32px;
             line-height: 1;
             display: inline-block;
+            font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif;
+            -webkit-transform-origin: 70% 80%;
             transform-origin: 70% 80%;
+            -webkit-animation:
+                wb-fadein 0.6s cubic-bezier(0.22, 1, 0.36, 1) both,
+                wb-wave 1.6s ease-in-out 0.7s 1 both;
             animation:
                 wb-fadein 0.6s cubic-bezier(0.22, 1, 0.36, 1) both,
                 wb-wave 1.6s ease-in-out 0.7s 1 both;
@@ -1385,6 +1453,7 @@ if (isset($_GET['ajax'])) {
 
         /* Soft shimmer on the user name */
         .wb-name {
+            color: #ffffff;
             background: linear-gradient(90deg,
                     #e2e8f0 20%,
                     #ffffff 40%,
@@ -1395,6 +1464,16 @@ if (isset($_GET['ajax'])) {
             background-clip: text;
             -webkit-text-fill-color: transparent;
             animation: wb-name-shimmer 3.2s linear 1s 1 both;
+        }
+
+        /* Browsers without background-clip:text: solid name, no shimmer */
+        @supports not ((-webkit-background-clip: text) and (-webkit-text-fill-color: transparent)) {
+            .wb-name {
+                background: none;
+                color: #ffffff;
+                -webkit-text-fill-color: #ffffff;
+                animation: none;
+            }
         }
 
         .welcome-banner p {
@@ -1409,6 +1488,7 @@ if (isset($_GET['ajax'])) {
             display: flex;
             align-items: center;
             gap: 12px;
+            background: #05080f;
             background: #05080fff;
             border: 1px solid #1e293b;
             border-radius: 14px;
@@ -1496,6 +1576,18 @@ if (isset($_GET['ajax'])) {
 
             .main-content {
                 padding: 24px 20px;
+            }
+        }
+
+        /* ─── Movimiento reducido: efectos estáticos, sin bucles infinitos ─── */
+        @media (prefers-reduced-motion: reduce) {
+
+            .welcome-wave,
+            .welcome-banner h2,
+            .welcome-banner p,
+            .main-content {
+                -webkit-animation: none !important;
+                animation: none !important;
             }
         }
     </style>
