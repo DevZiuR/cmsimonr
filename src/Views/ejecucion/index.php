@@ -670,14 +670,24 @@ $active = 'ejecucion';
 
         /* ── Layout ──────────────────────────────────────────────────── */
         .layout {
+            display: -ms-flexbox;
             display: flex;
+            -ms-flex: 1 1 auto;
             flex: 1;
+            /* IE11: prevent flex children from collapsing */
+            min-height: 0;
         }
 
         .main-content {
+            -ms-flex: 1 1 auto;
             flex: 1;
             padding: 32px 36px;
-            overflow-x: auto;
+            /* IE11: overflow-x on a flex child without explicit height collapses
+               the height — use overflow:visible here and let .table-scroll-wrap
+               handle horizontal scroll instead */
+            overflow-x: visible;
+            min-height: 0;
+            min-width: 0;
         }
 
         /* ── Barra de título / Banner (Top Bar) ────────────────────────── */
@@ -2225,7 +2235,17 @@ $active = 'ejecucion';
             document.addEventListener('click', function (e) {
                 var popover = document.getElementById('global-partida-popover');
                 if (popover && popover.classList.contains('open')) {
-                    if (!popover.contains(e.target) && !e.target.closest('.code-picker-btn')) {
+                    /* e.target.closest() not available in IE11 — use manual DOM walk */
+                    var isPickerBtn = false;
+                    var node = e.target;
+                    while (node && node !== document.body) {
+                        if (node.className && typeof node.className === 'string' && node.className.indexOf('code-picker-btn') !== -1) {
+                            isPickerBtn = true;
+                            break;
+                        }
+                        node = node.parentNode;
+                    }
+                    if (!popover.contains(e.target) && !isPickerBtn) {
                         closePartidaPicker();
                     }
                 }
