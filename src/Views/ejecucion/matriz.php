@@ -98,7 +98,7 @@ mysqli_query(
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8"
 );
 
-if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action'])) {
+if ((isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : '') === 'POST' && isset($_POST['action'])) {
     header('Content-Type: application/json');
     if (!$es_admin) {
         echo json_encode(array('ok' => false, 'msg' => 'Sin permisos'));
@@ -626,7 +626,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action'])) {
         $nuevo_credito_act = $cred_aprobado - $total_dismin;
         echo json_encode(array(
             'ok' => true,
-            'tipo' => $traspaso_tipo ?? 'normal',
+            'tipo' => (isset($traspaso_tipo) ? $traspaso_tipo : 'normal'),
             'total_dismin' => $total_dismin,
             'credito_act' => $nuevo_credito_act
         ));
@@ -3269,7 +3269,7 @@ $active = 'ejecucion-individual';
                                         $ext_monto = (float) $ext_tr['monto'];
                                         $ext_texto = normalizar_texto_traspaso($ext_tr['texto_completo']);
                                         $ext_fecha = date('n/j/Y', strtotime($ext_tr['fecha']));
-                                        $ext_num_fmt = sprintf('%03d', (int) ltrim($ext_tr['numero'] ?? '0', '0'));
+                                        $ext_num_fmt = sprintf('%03d', (int) ltrim(isset($ext_tr['numero']) ? $ext_tr['numero'] : '0', '0'));
 
                                         if ($ext_tipo === 'destino') {
                                             $ext_dismin = isset($aumento_map[$ext_op_id]) ? $aumento_map[$ext_op_id] : $ext_monto;

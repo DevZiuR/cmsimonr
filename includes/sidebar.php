@@ -324,8 +324,14 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
         overflow-x: hidden !important;
         padding: 10px 16px 10px 10px !important;
         flex: 1 !important;
+        /* IE11: use thin autohiding scrollbar instead of fat system default */
+        -ms-overflow-style: -ms-autohiding-scrollbar !important;
+        /* Firefox: thin scrollbar */
+        scrollbar-width: thin !important;
+        scrollbar-color: #27272a transparent !important;
     }
 
+    /* WebKit (Chrome, Edge, Safari): slim 4px scrollbar track */
     .sidebar .sb-nav::-webkit-scrollbar {
         width: 4px !important;
     }
@@ -333,6 +339,10 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
     .sidebar .sb-nav::-webkit-scrollbar-thumb {
         background: #27272a !important;
         border-radius: 4px !important;
+    }
+
+    .sidebar .sb-nav::-webkit-scrollbar-track {
+        background: transparent !important;
     }
 
     .sidebar .sb-section-label {
