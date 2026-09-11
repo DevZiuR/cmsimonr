@@ -2266,7 +2266,8 @@ $active = 'ejecucion';
                         });
 
                         inp.addEventListener('keydown', function (e) {
-                            if (e.key === 'Enter') {
+                            /* e.key is undefined in IE11; fall back to keyCode */
+                            if (e.key === 'Enter' || e.keyCode === 13) {
                                 inp.blur();
                             }
                         });
@@ -2522,7 +2523,7 @@ $active = 'ejecucion';
         }
 
         document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape' && document.body.classList.contains('fullscreen-mode')) {
+            if ((e.key === 'Escape' || e.keyCode === 27) && document.body.classList.contains('fullscreen-mode')) {
                 document.body.classList.remove('fullscreen-mode');
             }
         });
@@ -2556,12 +2557,18 @@ $active = 'ejecucion';
                 }
             }
 
-            scrollWrap.addEventListener('scroll', updateNavState, { passive: true });
+            /* { passive: true } throws in IE11 which only accepts boolean as 3rd arg */
+            scrollWrap.addEventListener('scroll', updateNavState, false);
             window.addEventListener('resize', updateNavState);
             setTimeout(updateNavState, 150);
 
+            /* scrollBy with options object not supported in IE11 — use scrollLeft directly */
             function doScroll(offset) {
-                scrollWrap.scrollBy({ left: offset, behavior: 'smooth' });
+                try {
+                    scrollWrap.scrollBy({ left: offset, behavior: 'smooth' });
+                } catch (ex) {
+                    scrollWrap.scrollLeft += offset;
+                }
             }
 
             var holdTimer = null;

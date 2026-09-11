@@ -3147,7 +3147,7 @@ $active = 'ejecucion-individual';
                                                         data-cod="<?php echo htmlspecialchars($cod_sel); ?>"
                                                         data-mes="<?php echo $mes_sel; ?>" data-anio="<?php echo $anio_sel; ?>"
                                                         data-cred-aprobado="<?php echo $credito_base_raw; ?>"
-                                                        data-traspaso-tipo="<?php echo htmlspecialchars($op_tr_tipo ?? ''); ?>"
+                                                        data-traspaso-tipo="<?php echo htmlspecialchars(isset($op_tr_tipo) ? $op_tr_tipo : ''); ?>"
                                                         title="<?php echo ($op_tr_tipo === 'destino') ? 'Aumento del Crédito Presupuestario — Partida DESTINO de traspaso' : 'Disminución del Crédito Presupuestario (editable — se guarda y refleja en el reporte mensual)'; ?>">
                                                     <span
                                                         class="print-mat-val"><?php echo ($campo_cred_val > 0) ? fmt_m($campo_cred_val) : '-'; ?></span>
