@@ -1453,26 +1453,23 @@ if (isset($_GET['ajax'])) {
 
         /* Soft shimmer on the user name */
         .wb-name {
+            /* IE/legacy-safe base: plain white, always visible */
             color: #ffffff;
-            background: linear-gradient(90deg,
-                    #e2e8f0 20%,
-                    #ffffff 40%,
-                    #bfdbfe 60%,
-                    #e2e8f0 80%);
-            background-size: 200% auto;
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
-            animation: wb-name-shimmer 3.2s linear 1s 1 both;
         }
 
-        /* Browsers without background-clip:text: solid name, no shimmer */
-        @supports not ((-webkit-background-clip: text) and (-webkit-text-fill-color: transparent)) {
+        /* Shimmer gradient — only in browsers that actually support background-clip:text */
+        @supports ((-webkit-background-clip: text) or (background-clip: text)) {
             .wb-name {
-                background: none;
-                color: #ffffff;
-                -webkit-text-fill-color: #ffffff;
-                animation: none;
+                background: linear-gradient(90deg,
+                        #e2e8f0 20%,
+                        #ffffff 40%,
+                        #bfdbfe 60%,
+                        #e2e8f0 80%);
+                background-size: 200% auto;
+                -webkit-background-clip: text;
+                background-clip: text;
+                -webkit-text-fill-color: transparent;
+                animation: wb-name-shimmer 3.2s linear 1s 1 both;
             }
         }
 

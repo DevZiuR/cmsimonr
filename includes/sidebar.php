@@ -617,7 +617,8 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
         flex-direction: column !important;
         gap: 3px !important;
         overflow: hidden !important;
-        flex: 1 !important;
+        flex: 1 1 0% !important;  /* IE11 needs explicit 0% basis */
+        min-width: 0 !important;  /* Prevents IE11 flex item from ignoring overflow:hidden */
     }
 
     .sidebar .sb-user-name {
@@ -628,6 +629,9 @@ $is_adm = in_array($sb_current, array('partidas', 'auditoria', 'usuarios'));
         overflow: hidden !important;
         text-overflow: ellipsis !important;
         letter-spacing: -0.1px !important;
+        min-width: 0 !important;   /* IE11 flex child collapse fix */
+        display: block !important; /* Ensures visibility when flex container collapses in IE */
+        max-width: 100% !important;
     }
 
     .sidebar .sb-user-sub {
